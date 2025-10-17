@@ -29,8 +29,8 @@ winding-generator/
 3) icon.png # Toolbar icon 
 ## 🧰 Requirements
 
-- KiCad **7 / 8 / 9**
-- Python **3.10+** (for the installer)
+- KiCad 
+- Python 
 - Windows / macOS / Linux
 
 ---
