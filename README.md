@@ -24,11 +24,9 @@ This KiCad **pcbnew Action Plugin** generates **planar magnetic windings** (rect
 
 ## 📦 Repository Structure
 winding-generator/
-├─ winding_generator.py # Main KiCad Action Plugin (Python)
-├─ install_to_kicad_plugin.py # One-click installer (asks for plugin folder)
-├─ icon.png # Toolbar icon (red winding)
-└─ README.md # This file
-
+1) winding_generator.py # Main KiCad Action Plugin (Python)
+2) install_to_kicad_plugin.py # One-click installer (asks for plugin folder)
+3) icon.png # Toolbar icon 
 ## 🧰 Requirements
 
 - KiCad **7 / 8 / 9**
