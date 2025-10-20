@@ -78,7 +78,6 @@ class ParamsDialog(wx.Dialog):
     """Single dialog. Click 'Use mouse' to capture center; OK to draw."""
     def __init__(self, parent):
         """Initialize and lay out the dialog UI."""
-        # (unchanged except for making the dialog resizable)
         super().__init__(parent, title="Place Planar Transformer Track",
                          style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
         self.SetMinSize(wx.Size(600, 720))
@@ -87,20 +86,15 @@ class ParamsDialog(wx.Dialog):
         p = wx.Panel(self)
         s = wx.BoxSizer(wx.VERTICAL)
 
-        # --- Center row (X/Y) with a capture button ---
-        grid_c = wx.FlexGridSizer(2, 3, 6, 8)
+        # --- Center rows (X/Y) (mouse capture removed) ---
+        grid_c = wx.FlexGridSizer(2, 2, 6, 8)  # 2 cols now
         grid_c.AddGrowableCol(1, 1)
         grid_c.Add(wx.StaticText(p, label="Center X:"), 0, wx.ALIGN_CENTER_VERTICAL)
         self.cx = wx.TextCtrl(p, value="0.0", style=wx.TE_RIGHT)
         grid_c.Add(self.cx, 1, wx.EXPAND)
-        # capture mouse → center_nm
-        self.btn_capture = wx.Button(p, label="Use mouse")
-        grid_c.Add(self.btn_capture, 0)
-        # spacer in the grid's last cell
         grid_c.Add(wx.StaticText(p, label="Center Y:"), 0, wx.ALIGN_CENTER_VERTICAL)
         self.cy = wx.TextCtrl(p, value="0.0", style=wx.TE_RIGHT)
         grid_c.Add(self.cy, 1, wx.EXPAND)
-        grid_c.Add((1,1))
         s.Add(grid_c, 0, wx.EXPAND | wx.BOTTOM, 8)
 
         def row(lbl, default):
@@ -147,16 +141,11 @@ class ParamsDialog(wx.Dialog):
         start_box.Add(self.rb_top); start_box.Add(self.rb_center); start_box.Add(self.rb_bottom)
         s.Add(start_box, 0, wx.EXPAND | wx.BOTTOM, 6)
 
-        # Little tip for the capture workflow
-        s.Add(wx.StaticText(p, label="Tip: click 'Use mouse', then hover on canvas and release."), 0, wx.TOP | wx.BOTTOM, 4)
-
-        # ---------------------- ADDED: Parameter diagram (no scaling) ----------------------
+        # ---------------------- Parameter diagram (no scaling) ----------------------
         diag_box = wx.StaticBoxSizer(wx.VERTICAL, p, "Parameter diagram")
         self._diag_bmp = wx.StaticBitmap(p, bitmap=wx.NullBitmap)
-        # Give the box vertical space but DO NOT scale the bitmap; reserve room around it.
-        # needed when the figure is changed (important)
-        self._diag_bmp.SetMinSize(wx.Size(-1, 100))            # grows the box; bitmap stays native size
-        diag_box.Add(self._diag_bmp, 1, wx.EXPAND | wx.ALL, 6) # expand the box, not the image
+        self._diag_bmp.SetMinSize(wx.Size(-1, 100))
+        diag_box.Add(self._diag_bmp, 1, wx.EXPAND | wx.ALL, 6)
         s.Add(diag_box, 1, wx.EXPAND | wx.TOP, 4)
 
         # Load image at native size (no resampling)
@@ -167,7 +156,6 @@ class ParamsDialog(wx.Dialog):
                 _img = wx.Image(img_path, wx.BITMAP_TYPE_ANY)
                 if _img.IsOk():
                     self._orig_img = _img
-                    # Set bitmap ONCE at native size (no scaling)
                     self._diag_bmp.SetBitmap(wx.Bitmap(self._orig_img))
             except Exception:
                 pass
@@ -182,36 +170,14 @@ class ParamsDialog(wx.Dialog):
         root.Add(btns, 0, wx.EXPAND | wx.ALL, 8)
         self.SetSizerAndFit(root)
 
-        # Internal state: captured center (pcbnew.VECTOR2I in nm), None until captured.
+        # Internal state: captured center (removed mouse capture → always None)
         self.center_nm = None
-        # Wire the capture button
-        self.btn_capture.Bind(wx.EVT_BUTTON, self.on_capture_center)
 
-    # (kept to satisfy structure; does nothing since we don't scale on resize)
     def _on_dialog_resize(self, evt):
         evt.Skip()
 
     def _refresh_diagram_bitmap(self):
-        # Intentionally no-op: we do not scale the image; it stays at native size.
         return
-
-    def on_capture_center(self, _evt):
-        """Capture the current pcbnew mouse/crosshair position and reflect it in the dialog."""
-        self.Hide()
-        wx.YieldIfNeeded()
-        try:
-            kfrm = pcbnew.GetPIFrame()
-            if kfrm:
-                kfrm.Raise(); kfrm.SetFocus()
-        except Exception:
-            pass
-        wx.MilliSleep(500)  # short settle
-        pos = pcbnew.GetMousePosition()
-        self.center_nm = pos
-        # Show coordinates in mm for the user
-        self.cx.SetValue(f"{to_mm(pos.x):.3f}")
-        self.cy.SetValue(f"{to_mm(pos.y):.3f}")
-        self.Show(); self.Raise()
 
     def get(self):
         """Return parameters in mm plus the captured center in nm (or None)."""
@@ -231,7 +197,7 @@ class ParamsDialog(wx.Dialog):
             n=int(float(self.turns.GetValue())),
             start=start,
             layer_name=self.layer_choice.GetStringSelection(),
-            center_nm=self.center_nm,
+            center_nm=self.center_nm,  # remains None → Run() uses entered mm
         )
 
 
@@ -458,7 +424,7 @@ class PlanarRectSpiralLC(pcbnew.ActionPlugin):
             dlg.Destroy(); return
         P = dlg.get(); dlg.Destroy()
 
-        # 2) Center: prefer captured mouse (nm). If None, use entered mm → nm.
+        # 2) Center: with mouse capture removed, always use entered mm → nm.
         if P["center_nm"] is not None:
             center = P["center_nm"]
         else:
@@ -489,7 +455,7 @@ class PlanarRectSpiralLC(pcbnew.ActionPlugin):
         finally:
             if tx: tx.Commit()
         pcbnew.Refresh()
-        wx.MessageBox("Spiral created.", "Done")
+        # wx.MessageBox("Spiral created.", "Done")
 
 
 # Register
