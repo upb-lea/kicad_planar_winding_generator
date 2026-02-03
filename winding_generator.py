@@ -55,7 +55,25 @@ def add_track(board, p1, p2, layer, width):
     board.Add(t)
 
 def add_arc(board, center, radius, ang_start_deg, ang_end_deg, layer, width):
-    """Create a circular arc by start/mid/end points. Angles in degrees (0=+x, CCW positive)."""
+    """Create a circular arc by start/mid/end points. Angles in degrees (0=+x, CCW positive).
+    :param board: Current board instance
+    :type: pcbnew.BOARD
+    :param center: Center point of the arc on board (internal units, nm)
+    :type: pcbnew.VECTOR2I
+    :param radius: Radius of the arc measured from the center point (internal units, nm)
+    :type: float
+    :param ang_start_deg: Start angle of the arc in degrees. O degrees points in the +X direction.
+                          Positive angles are counter-clockwise.
+    :type: float
+    :param ang_end_deg: End angle of the arc in degrees. O degrees points in the +X direction.
+                          Positive angles are counter-clockwise.
+    :type: float
+    :param layer: Target KiCad layer ID (e.g., pcbnew.F_Cu).
+    :type layer: int
+    :param width: Width of straight copper TRACK segment (mm).
+    :type width: float
+    :rtype: None
+    """
     a1 = d2r(ang_start_deg)
     a3 = d2r(ang_end_deg)
     a2 = d2r((ang_start_deg + ang_end_deg) / 2.0)
@@ -69,6 +87,7 @@ def add_arc(board, center, radius, ang_start_deg, ang_end_deg, layer, width):
 
 def layer_id(board, name):
     """Resolve a human-readable layer name to a KiCad layer ID."""
+    # TODO add parameter description
     lid = board.GetLayerID(name)
     return lid if lid != -1 else pcbnew.F_Cu
 
