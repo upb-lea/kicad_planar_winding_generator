@@ -63,7 +63,7 @@ def add_arc(board, center, radius, ang_start_deg, ang_end_deg, layer, width):
     :param radius: Radius of the arc measured from the center point (internal units, nm)
     :type: float
     :param ang_start_deg: Start angle of the arc in degrees. O degrees points in the +X direction.
-                          Positive angles are counter-clockwise.
+                          Positive angles are counter-clockwise.TODO confirm if ccw or cw
     :type: float
     :param ang_end_deg: End angle of the arc in degrees. O degrees points in the +X direction.
                           Positive angles are counter-clockwise.
@@ -259,6 +259,7 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
                        w_length: int, w_height: int, r_corner:int, clearance: int,
                        track_width: int, track_spacing: int, n: int):
     """Draw a rectangle spiral starting from the left-center. All internal geometry is integer nanometers."""
+    #TODO add docstring for parameter description
     radius = min(r_corner, w_length // 2, w_height // 2)
     t_width = track_width
     Clearance = clearance
@@ -303,7 +304,7 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
             if windings == 1:
                 now_y = now_y - (t_width // 2) - (t_spacing // 2)
 
-        c1 = v2(now_x + radius_now, now_y)
+        c1 = v2(now_x + radius_now, now_y) # center of the first arc
         add_arc(board, c1, radius_now, 90, 90 + angle, layer, t_width)
         now_x = now_x + radius_now
         now_y = now_y + radius_now
