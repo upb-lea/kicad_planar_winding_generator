@@ -86,8 +86,16 @@ def add_arc(board, center, radius, ang_start_deg, ang_end_deg, layer, width):
     board.Add(arc)
 
 def layer_id(board, name):
-    """Resolve a human-readable layer name to a KiCad layer ID."""
-    # TODO add parameter description
+    """Resolve a human-readable layer name to a KiCad layer ID.
+
+    :param board: Current board instance
+    :type: pcbnew.BOARD
+    :param name: KiCad layer name (e.g "F.Cu", "B.Cu")
+    :type: str
+    :return: KiCad layer ID
+    :rtype: int
+    """
+
     lid = board.GetLayerID(name)
     return lid if lid != -1 else pcbnew.F_Cu
 
@@ -258,25 +266,48 @@ class ParamsDialog(wx.Dialog):
 def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                        w_length: int, w_height: int, r_corner:int, clearance: int,
                        track_width: int, track_spacing: int, n: int):
-    """Draw a rectangle spiral starting from the left-center. All internal geometry is integer nanometers."""
-    #TODO add docstring for parameter description
+    """Draw a rectangle spiral starting from the left-center. All internal geometry is integer nanometers.
+
+    :param board: Current board instance
+    :type: pcbnew.BOARD
+    :param layer: Target KiCad layer ID (e.g., pcbnew.F_Cu).
+    :type layer: int
+    :param center: Center point of the winding on board (internal units, nm)
+    :type: pcbnew.VECTOR2I
+    :param w_length: Core length (center-leg), diameter for cylindrical cores
+    :type: int (internal units, nm)
+    :param w_height: Core width (center-leg), diameter for cylindrical cores
+    :type: int (internal units, nm)
+    :param r_corner: Radius of the arc forming the corners
+    :type: int (internal units, nm)
+    :param clearance: spacing between the core center leg and the inner winding
+    :type: int (internal units, nm)
+    :param track_width: Width of the copper trace
+    :type: int (internal units, nm)
+    :param track_spacing: Spacing between two adjacent traces
+                          Spacing between two adjacent turns on the same layer
+    :type: int (internal units, nm)
+    :param n: number of turns
+    :type: int (internal units, nm)
+    """
+
     radius = min(r_corner, w_length // 2, w_height // 2)
     t_width = track_width
-    Clearance = clearance
+    Clearance = clearance # spacing between the inner core and inner turn
 
-    f_length = w_length - 2 * radius
-    f_height = w_height - 2 * radius
+    f_length = w_length - 2 * radius # length of the straight portion of the trace (placed horizontally)
+    f_height = w_height - 2 * radius # length of the straight portion of the trace (placed vertically)
 
-    t_spacing = track_spacing
-    windings = n
-    radius_now = radius + Clearance + (t_width // 2)
+    t_spacing = track_spacing # Spacing between the turns
+    windings = n # number of turns
 
-    ax, ay = center.x, center.y
-    now_x = ax - (w_length // 2) - Clearance - (t_width // 2)
-    now_y = ay
+    ax, ay = center.x, center.y # center point (x,y) of the winding
+    now_x = ax - (w_length // 2) - Clearance - (t_width // 2) # Starting point of the trace on the x-axis
+    now_y = ay # Starting point of the trace on the y-axis
+    radius_now = radius + Clearance + (t_width // 2)  # adjusted radius of the first arc
 
     angle = 90
-    rad_inc1 = t_spacing + t_width
+    rad_inc1 = t_spacing + t_width # increment for last arc in each turn for n > 1
     rad_inc2 = rad_inc1
 
     limit = (w_height // 2) + Clearance + (t_width // 2)
@@ -295,41 +326,53 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
 
     for _ in range(windings):
         if angle == 90:
-            p1 = v2(now_x, now_y)
-            p2 = v2(now_x, now_y + (f_height // 2))
-            if windings == 1:
-                p2 = v2(p2.x, p2.y - ((t_width // 2) - (t_spacing // 2)))
+            p1 = v2(now_x, now_y) # Start point for initial straight trace
+            p2 = v2(now_x, now_y + (f_height // 2)) # End point for initial straight trace
+            if windings == 1: #TODO maybe also adjust start point
+                p2 = v2(p2.x, p2.y - ((t_width // 2) - (t_spacing // 2))) # Adjust end point for single turn
             add_track(board, p1, p2, layer, t_width)
             now_y = now_y + (f_height // 2)
             if windings == 1:
                 now_y = now_y - (t_width // 2) - (t_spacing // 2)
 
+        # Add arc bottom left
         c1 = v2(now_x + radius_now, now_y) # center of the first arc
         add_arc(board, c1, radius_now, 90, 90 + angle, layer, t_width)
         now_x = now_x + radius_now
         now_y = now_y + radius_now
 
+        # Add straight trace (placed horizontally on the lower side)
         add_track(board, v2(now_x, now_y), v2(now_x + f_length, now_y), layer, t_width)
         now_x = now_x + f_length
 
+        # Add arc (curved trace) bottom right
         c2 = v2(now_x, now_y - radius_now)
         add_arc(board, c2, radius_now, 0, 90, layer, t_width)
         now_x = now_x + radius_now
         now_y = now_y - radius_now
 
+        # Add straight trace (placed vertically on the right side)
         add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
         now_y = now_y - f_height
 
+        # Add arc top right
         c3 = v2(now_x - radius_now, now_y)
         add_arc(board, c3, radius_now, 270, 360, layer, t_width)
         now_x = now_x - radius_now
         now_y = now_y - radius_now
 
+        # Add straight trace (placed horizontally on the upper side)
         add_track(board, v2(now_x, now_y), v2(now_x - f_length - rad_inc2, now_y), layer, t_width)
         now_x = now_x - f_length - rad_inc2
 
-        radius_now = radius_now + rad_inc1
+        # TODO resolve assignment for Gap -> (t_spacing) and Guard -> (clearance)
+        # current usage seems to be interchanged
+        # TODO resolve conflicting implementation of t_spacing
+        # current spacing not correct
+        # update (rad_inc1 --> (t_spacing//2) + (t_width//2))
+        radius_now = radius_now + rad_inc1 # Increment the radius of the arc to space out the next turn
 
+        # Add arc top left
         c4 = v2(now_x, now_y + radius_now)
         add_arc(board, c4, radius_now, 270 - angle, 270, layer, t_width)
         now_x = now_x - radius_now
@@ -349,7 +392,30 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
 def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                        w_length: int, w_height: int, r_corner: int, clearance: int,
                        track_width: int, track_spacing: int, n: int):
-    """Draw a rectangle spiral starting from the left-top. All internal geometry is integer nanometers."""
+    """Draw a rectangle spiral starting from the left-top. All internal geometry is integer nanometers.
+
+    :param board: Current board instance
+    :type: pcbnew.BOARD
+    :param layer: Target KiCad layer ID (e.g., pcbnew.F_Cu).
+    :type layer: int
+    :param center: Center point of the winding on board (internal units, nm)
+    :type: pcbnew.VECTOR2I
+    :param w_length: Core length (center-leg), diameter for cylindrical cores
+    :type: int (internal units, nm)
+    :param w_height: Core width (center-leg), diameter for cylindrical cores
+    :type: int (internal units, nm)
+    :param r_corner: Radius of the arc forming the corners
+    :type: int (internal units, nm)
+    :param clearance: spacing between the core center leg and the inner winding
+    :type: int (internal units, nm)
+    :param track_width: Width of the copper trace
+    :type: int (internal units, nm)
+    :param track_spacing: Spacing between two adjacent traces
+                          Spacing between two adjacent turns on the same layer
+    :type: int (internal units, nm)
+    :param n: number of turns
+    :type: int (internal units, nm)
+    """
     if n == 1:
         create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
         return
@@ -403,7 +469,30 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
 def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                     w_length: int, w_height: int, r_corner: int, clearance: int,
                     track_width: int, track_spacing: int, n: int):
-    """Draw a rectangle spiral starting from the left-bottom. All internal geometry is integer nanometers."""
+    """Draw a rectangle spiral starting from the left-bottom. All internal geometry is integer nanometers.
+
+    :param board: Current board instance
+    :type: pcbnew.BOARD
+    :param layer: Target KiCad layer ID (e.g., pcbnew.F_Cu).
+    :type layer: int
+    :param center: Center point of the winding on board (internal units, nm)
+    :type: pcbnew.VECTOR2I
+    :param w_length: Core length (center-leg), diameter for cylindrical cores
+    :type: int (internal units, nm)
+    :param w_height: Core width (center-leg), diameter for cylindrical cores
+    :type: int (internal units, nm)
+    :param r_corner: Radius of the arc forming the corners
+    :type: int (internal units, nm)
+    :param clearance: spacing between the core center leg and the inner winding
+    :type: int (internal units, nm)
+    :param track_width: Width of the copper trace
+    :type: int (internal units, nm)
+    :param track_spacing: Spacing between two adjacent traces
+                          Spacing between two adjacent turns on the same layer
+    :type: int (internal units, nm)
+    :param n: number of turns
+    :type: int (internal units, nm)
+    """
     if n == 1:
         create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
         return
