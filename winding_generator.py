@@ -107,10 +107,10 @@ class ParamsDialog(wx.Dialog):
             return tc
 
         # Parameter names (all mm)
-        self.gap    = row("Gap (mm):", "0.30")       # inner clearance
+        self.gap    = row("Turn-Core (mm):", "0.30")       # inner clearance
         self.radius = row("Radius (mm):", "2.00")    # corner radius
         self.twidth = row("Width (mm):", "0.25")     # track width
-        self.guard  = row("Guard (mm):", "0.25")     # track-to-track spacing
+        self.guard  = row("Turn-Turn (mm):", "0.25")     # track-to-track spacing
 
         props = wx.StaticBoxSizer(wx.VERTICAL, p, "Properties")
         grid  = wx.FlexGridSizer(2, 4, 6, 8)
