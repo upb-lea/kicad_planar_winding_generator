@@ -283,21 +283,24 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
         rad_inc1 = limit - radius_now
         rad_inc2 = rad_inc2 - rad_inc1
 
+    # Single turn (n = 1) consideration
+    # Adjust the trace starting point in y direction
+    # arc increment not required (set to zero)
     if windings == 1:
         now_y = now_y + (t_width // 2) + (t_spacing // 2)
         rad_inc1 = 0; rad_inc2 = 0
 
     if radius_now > ((w_height // 2) + Clearance - (t_spacing // 2)):
-        ratio = 1.0 - float(((w_height // 2) + Clearance - (t_spacing // 2))) / float(radius_now)
+        ratio = float(((w_height // 2) + Clearance - (t_spacing // 2))) / float(radius_now)
         ratio = max(-1.0, min(1.0, ratio))
-        angle = int(round(180.0 * math.acos(ratio) / math.pi))
+        angle = int(round(180.0 * math.asin(ratio) / math.pi))
 
     for _ in range(windings):
         if angle == 90:
             p1 = v2(now_x, now_y) # Start point for initial straight trace
             p2 = v2(now_x, now_y + (f_height // 2)) # End point for initial straight trace
             if windings == 1: #TODO maybe also adjust start point
-                p2 = v2(p2.x, p2.y - ((t_width // 2) - (t_spacing // 2))) # Adjust end point for single turn
+                p2 = v2(p2.x, p2.y - ((t_width // 2) + (t_spacing // 2))) # Adjust end point for single turn
             add_track(board, p1, p2, layer, t_width)
             now_y = now_y + (f_height // 2)
             if windings == 1:
@@ -305,19 +308,30 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
 
         # Add arc bottom left
         c1 = v2(now_x + radius_now, now_y) # center of the first arc
-        add_arc(board, c1, radius_now, 90, 90 + angle, layer, t_width)
-        now_x = now_x + radius_now
-        now_y = now_y + radius_now
+        start_angle = 180
+        end_angle = 180 - angle
+        add_arc(board, c1, radius_now, start_angle, end_angle, layer, t_width)
+        end_angle_rad = math.radians(end_angle)
+        # now_x = now_x + radius_now
+        # now_y = now_y + radius_now
+        now_x = int(round(c1.x + radius_now * math.cos(end_angle_rad)))
+        now_y = int(round(c1.y + radius_now * math.sin(end_angle_rad)))
 
         # Add straight trace (placed horizontally on the lower side)
-        add_track(board, v2(now_x, now_y), v2(now_x + f_length, now_y), layer, t_width)
+        f_length_inc = (-2 * radius_now * math.cos(end_angle_rad)) + f_length
+        add_track(board, v2(now_x, now_y), v2(now_x + f_length_inc, now_y), layer, t_width)
         now_x = now_x + f_length
 
         # Add arc (curved trace) bottom right
         c2 = v2(now_x, now_y - radius_now)
-        add_arc(board, c2, radius_now, 0, 90, layer, t_width)
-        now_x = now_x + radius_now
-        now_y = now_y - radius_now
+        start_angle = 90
+        end_angle = 90 - angle
+        add_arc(board, c2, radius_now, start_angle, end_angle, layer, t_width)
+        end_angle_rad = math.radians(end_angle)
+        # now_x = now_x + radius_now
+        # now_y = now_y - radius_now
+        now_x = int(round(c2.x + radius_now * math.cos(end_angle_rad)))
+        now_y = int(round(c2.y + radius_now * math.sin(end_angle_rad)))
 
         # Add straight trace (placed vertically on the right side)
         add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
@@ -325,9 +339,14 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
 
         # Add arc top right
         c3 = v2(now_x - radius_now, now_y)
-        add_arc(board, c3, radius_now, 270, 360, layer, t_width)
-        now_x = now_x - radius_now
-        now_y = now_y - radius_now
+        start_angle = 360
+        end_angle = 360 - angle
+        add_arc(board, c3, radius_now, start_angle, end_angle, layer, t_width)
+        end_angle_rad = math.radians(end_angle)
+        # now_x = now_x - radius_now
+        # now_y = now_y - radius_now
+        now_x = int(round(c3.x + radius_now * math.cos(end_angle_rad)))
+        now_y = int(round(c3.y + radius_now * math.sin(end_angle_rad)))
 
         # Add straight trace (placed horizontally on the upper side)
         add_track(board, v2(now_x, now_y), v2(now_x - f_length - rad_inc2, now_y), layer, t_width)
@@ -338,9 +357,14 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
 
         # Add arc top left
         c4 = v2(now_x, now_y + radius_now)
-        add_arc(board, c4, radius_now, 270 - angle, 270, layer, t_width)
-        now_x = now_x - radius_now
-        now_y = now_y + radius_now
+        start_angle = 270
+        end_angle = 270 - angle
+        add_arc(board, c4, radius_now, start_angle, end_angle, layer, t_width)
+        end_angle_rad = math.radians(end_angle)
+        # now_x = now_x - radius_now
+        # now_y = now_y + radius_now
+        now_x = int(round(c4.x + radius_now * math.cos(end_angle_rad)))
+        now_y = int(round(c4.y + radius_now * math.sin(end_angle_rad)))
 
         if angle == 90:
             p3 = v2(now_x, now_y)
@@ -394,6 +418,9 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     t_spacing = track_spacing
     radius_now = radius + Clearance + (t_width // 2)
 
+    # The start point touch the
+    # TODO set x starting point to center
+    # nox_x = ax for first turn
     ax, ay = center.x, center.y
     now_x = ax - (f_length // 2)
     now_y = ay + (w_height // 2) + Clearance + (t_width // 2)
