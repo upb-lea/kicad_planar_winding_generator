@@ -399,7 +399,13 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     now_y = ay + (w_height // 2) + Clearance + (t_width // 2)
 
     for _ in range(n):
-        add_track(board, v2(now_x, now_y), v2(now_x + f_length, now_y), layer, t_width)
+        # add a slight offset for the first turn to prevent overlap
+        first_turn_offset = 0
+        if _ == 0:
+            first_turn_offset = t_width // 2
+
+
+        add_track(board, v2(now_x + first_turn_offset, now_y), v2(now_x + f_length, now_y), layer, t_width)
         now_x = now_x + f_length
 
         add_arc(board, v2(now_x, now_y - radius_now), radius_now, 0, 90, layer, t_width)
@@ -476,7 +482,13 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
     now_y = ay - (f_height // 2)
 
     for _ in range(n):
-        add_track(board, v2(now_x, now_y), v2(now_x, now_y + f_height), layer, t_width)
+        # add a slight offset for the first turn to prevent overlap
+        first_turn_offset = 0
+        if _ == 0:
+            first_turn_offset = t_width // 2
+
+
+        add_track(board, v2(now_x, now_y + first_turn_offset), v2(now_x, now_y + f_height), layer, t_width)
         now_y = now_y + f_height
 
         add_arc(board, v2(now_x + radius_now, now_y), radius_now, 90, 180, layer, t_width)
