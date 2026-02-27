@@ -98,6 +98,15 @@ You can re-run the installer any time, but do not forget to update the plugin in
 
 **MIT License**.
 
+## 🔗 Related Work
+
+Similar planar inductor / spiral generation tools exist for other EDA platforms.
+In particular, Altium Designer users may refer to:
+
+- https://github.com/Altium-Designer-addons/scripts-libraries
+
+which contains PCB scripting utilities, including scripts for generating
+spiral / planar inductor geometries inside Altium Designer.
 ---
 
 ## 👤 Author
