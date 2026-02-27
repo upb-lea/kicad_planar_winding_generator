@@ -270,10 +270,12 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     ax, ay = center.x, center.y # center point (x,y) of the winding
     now_x = ax - (w_length // 2) - Clearance - (t_width // 2) # Starting point of the trace on the x-axis
     now_y = ay # Starting point of the trace on the y-axis
+    #TODO resolve first turn arc clearance issue
+    # The arc and the corners of the core touches or lacks correct clearance
     radius_now = radius + Clearance + (t_width // 2)  # adjusted radius of the first arc
 
     angle = 90
-    rad_inc1 = t_spacing + t_width # increment for last arc in each turn for n > 1
+    rad_inc1 = (t_spacing // 2) + (t_width // 2) # increment for last arc in each turn for n > 1
     rad_inc2 = rad_inc1
 
     limit = (w_height // 2) + Clearance + (t_width // 2)
@@ -331,11 +333,7 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
         add_track(board, v2(now_x, now_y), v2(now_x - f_length - rad_inc2, now_y), layer, t_width)
         now_x = now_x - f_length - rad_inc2
 
-        # TODO resolve assignment for Gap -> (t_spacing) and Guard -> (clearance)
-        # current usage seems to be interchanged
-        # TODO resolve conflicting implementation of t_spacing
-        # current spacing not correct
-        # update (rad_inc1 --> (t_spacing//2) + (t_width//2))
+
         radius_now = radius_now + rad_inc1 # Increment the radius of the arc to space out the next turn
 
         # Add arc top left
@@ -401,7 +399,13 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     now_y = ay + (w_height // 2) + Clearance + (t_width // 2)
 
     for _ in range(n):
-        add_track(board, v2(now_x, now_y), v2(now_x + f_length, now_y), layer, t_width)
+        # add a slight offset for the first turn to prevent overlap
+        first_turn_offset = 0
+        if _ == 0:
+            first_turn_offset = t_width // 2
+
+
+        add_track(board, v2(now_x + first_turn_offset, now_y), v2(now_x + f_length, now_y), layer, t_width)
         now_x = now_x + f_length
 
         add_arc(board, v2(now_x, now_y - radius_now), radius_now, 0, 90, layer, t_width)
@@ -478,7 +482,13 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
     now_y = ay - (f_height // 2)
 
     for _ in range(n):
-        add_track(board, v2(now_x, now_y), v2(now_x, now_y + f_height), layer, t_width)
+        # add a slight offset for the first turn to prevent overlap
+        first_turn_offset = 0
+        if _ == 0:
+            first_turn_offset = t_width // 2
+
+
+        add_track(board, v2(now_x, now_y + first_turn_offset), v2(now_x, now_y + f_height), layer, t_width)
         now_y = now_y + f_height
 
         add_arc(board, v2(now_x + radius_now, now_y), radius_now, 90, 180, layer, t_width)

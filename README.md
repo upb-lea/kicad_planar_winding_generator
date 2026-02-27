@@ -8,11 +8,11 @@ This KiCad **pcbnew Action Plugin** generates **planar magnetic windings** (rect
 
 - Rectangular spiral with rounded corners
 - Adjustable parameters:
-  - Width & Height (outer window)
+  - Width & Height (Core leg)
   - Corner Radius
   - Track Width
-  - Track Spacing (Guard)
-  - Inner Gap (first-turn clearance)
+  - Track Spacing (Turn-Turn)
+  - Inner Spacing (Turn-Core)
   - Number of Turns
   - Start position: **Left-Top / Left-Center / Left-Bottom**
 - Pick center using the **mouse** on the canvas
@@ -62,8 +62,9 @@ winding-generator/
 2. Click the **Winding Generator** toolbar icon (red spiral) or run it from  
    **Tools → External Plugins → Winding Generator**.
 3. In the dialog:
-   - Click **Use mouse** to pick the center from the canvas (or type X/Y in mm).
-   - Set **Width, Height, Radius, Gap, Track Width, Guard (spacing), Turns**.
+   - Enter the center point of the winding **Center X, Center Y**.
+   - Set the **Radius, Turn-Core (clearance), Track Width, Turn-Turn (spacing)**.
+   - Set the **Width, Height, Turns**
    - Choose **Start position** (Left-Top / Left-Center / Left-Bottom).
    - Select the **Layer** (e.g., F.Cu).
 4. Click **OK**. The spiral is drawn as TRACKs and 90° ARCs on the chosen layer.
@@ -72,18 +73,18 @@ winding-generator/
 
 ## 🔧 Parameters (Quick Reference)
 
-| Field              | Meaning                                                                 |
-|--------------------|-------------------------------------------------------------------------|
-| **Center X/Y (mm)**| Spiral center. Use **Use mouse** to capture from the canvas.           |
-| **Width (mm)**     | Outer window width of the rounded rectangle.                            |
-| **Height (mm)**    | Outer window height of the rounded rectangle.                           |
-| **Radius (mm)**    | Corner radius.                                                          |
-| **Gap (mm)**       | Inner clearance from window to first turn.                              |
-| **Width (mm)**     | Track width (copper trace width).                                       |
-| **Guard (mm)**     | Track-to-track spacing between adjacent turns.                          |
-| **Turns**          | Number of spiral turns.                                                 |
-| **Start Position** | Left-Top / Left-Center / Left-Bottom path start.                        |
-| **Layer**          | Target copper layer (F.Cu, B.Cu, In1.Cu, …).                            |
+| Field               | Meaning                                                |
+|---------------------|--------------------------------------------------------|
+| **Center X/Y (mm)** | Spiral center. Enter X and Y position in mm.           |
+| **Width (mm)**      | Width of the core leg (Diameter for round core leg).   |
+| **Height (mm)**     | Height of the core leg (Diameter for round core leg).  |
+| **Radius (mm)**     | Corner radius.                                         |
+| **Turn-Core (mm)**  | Inner clearance from the core to the first turn.       |
+| **Width (mm)**      | Track width (copper trace width).                      |
+| **Turn-Turn (mm)**  | Track-to-track spacing between adjacent turns.         |
+| **Turns**           | Number of spiral turns.                                |
+| **Start Position**  | Left-Top / Left-Center / Left-Bottom path start.       |
+| **Layer**           | Target copper layer (F.Cu, B.Cu, In1.Cu, …).           |
 
 ---
 
