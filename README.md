@@ -109,6 +109,10 @@ In particular, Altium Designer users may refer to:
 which contains PCB scripting utilities, including scripts for generating
 spiral / planar inductor geometries inside Altium Designer.
 ---
+For KiCad users interested in circular spiral geometries, the following plugin may also be useful:
+
+- https://github.com/tristanitschner/kicad_spiral_plugin 
+It can be useful when designing **circular planar inductors or spiral coils**, whereas this project focuses on **rectangular planar winding geometries**.
 
 ## 👤 Author
 
