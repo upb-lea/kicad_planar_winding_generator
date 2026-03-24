@@ -135,7 +135,7 @@ class ParamsDialog(wx.Dialog):
 
         # Parameter names (all mm)
         self.gap    = row("Turn-Core (mm):", "0.30")       # inner clearance
-        self.radius = row("Radius (mm):", "2.00")    # corner radius
+        #self.radius = row("Radius (mm):", "2.00")    # corner radius
         self.twidth = row("Width (mm):", "0.25")     # track width
         self.guard  = row("Turn-Turn (mm):", "0.25")     # track-to-track spacing
 
@@ -149,6 +149,37 @@ class ParamsDialog(wx.Dialog):
         grid.Add(wx.StaticText(p, label="Height <h> (mm)"), 0, wx.ALIGN_CENTER_VERTICAL)
         self.size_y = wx.TextCtrl(p, value="16.0", style=wx.TE_RIGHT); grid.Add(self.size_y, 1, wx.EXPAND)
         props.Add(grid, 0, wx.EXPAND | wx.ALL, 4)
+
+        # # Winding corner type selector
+        hl_corner = wx.BoxSizer(wx.HORIZONTAL)
+
+        corner_label = wx.StaticText(p, label="Winding Corner Type")
+        hl_corner.Add(corner_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
+
+        self.corner_choice = wx.Choice(p,
+                                       choices=["Rounded Corner", "Right Angled Corner"])
+
+        self.corner_choice.SetSelection(0)
+
+        hl_corner.Add(self.corner_choice, 1, wx.EXPAND | wx.RIGHT, 12)
+
+        props.Add(hl_corner, 0, wx.EXPAND | wx.TOP, 4)
+
+        # Radius Input
+        self.radius_row = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.radius_label = wx.StaticText(p, label="Radius (mm):")
+        self.radius_row.Add(self.radius_label,
+                            0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
+
+        self.radius_ctrl = wx.TextCtrl(p, value="0.0", style = wx.TE_RIGHT)
+        self.radius_row.Add(self.radius_ctrl,
+                            1, wx.EXPAND | wx.RIGHT, 12)
+
+        props.Add(self.radius_row, 0, wx.EXPAND | wx.TOP, 4)
+
+        self.corner_choice.Bind(wx.EVT_CHOICE, self.on_corner_type_change)
+        wx.CallAfter(self.update_corner_ui)
 
         # Layer selector
         hl = wx.BoxSizer(wx.HORIZONTAL)
@@ -210,6 +241,11 @@ class ParamsDialog(wx.Dialog):
         """Return parameters in mm plus the captured center in nm (or None)."""
         def f(v): return float(v)
         start = 1  # default Left-Center
+        # r = 0.0
+        if self.corner_choice.GetSelection() == 0:
+            r = float(self.radius_ctrl.GetValue())
+        else:
+            r = 0.0
         if self.rb_top.GetValue(): start = 0
         if self.rb_bottom.GetValue(): start = 2
         return dict(
@@ -217,7 +253,7 @@ class ParamsDialog(wx.Dialog):
             cy_mm=f(self.cy.GetValue()),
             sx=f(self.size_x.GetValue()),
             sy=f(self.size_y.GetValue()),
-            r=f(self.radius.GetValue()),
+            r=r,
             cin=f(self.gap.GetValue()),
             w=f(self.twidth.GetValue()),
             sp=f(self.guard.GetValue()),
@@ -227,6 +263,21 @@ class ParamsDialog(wx.Dialog):
             center_nm=self.center_nm,  # remains None → Run() uses entered mm
         )
 
+    def on_corner_type_change(self, event):
+        self.update_corner_ui()
+
+    def update_corner_ui(self):
+        is_rounded = (self.corner_choice.GetSelection() == 0)
+
+        self.radius_label.Enable(is_rounded)
+        self.radius_ctrl.Enable(is_rounded)
+
+        # Optional: force radius to 0 when sharp selected
+        if not is_rounded:
+            self.radius_ctrl.SetValue("0.0")
+
+        self.Layout()
+        self.Fit()
 
 # ---------------------- Geometry routines ----------------------
 def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
@@ -287,7 +338,8 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
         now_y = now_y + (t_width // 2) + (t_spacing // 2)
         rad_inc1 = 0; rad_inc2 = 0
 
-    if radius_now > ((w_height // 2) + Clearance - (t_spacing // 2)):
+    # radius_now > ((w_height // 2) + Clearance - (t_spacing // 2)):
+    if radius_now > ((w_height // 2) + Clearance + (t_width // 2)):
         ratio = 1.0 - float(((w_height // 2) + Clearance - (t_spacing // 2))) / float(radius_now)
         ratio = max(-1.0, min(1.0, ratio))
         angle = int(round(180.0 * math.acos(ratio) / math.pi))
@@ -305,7 +357,7 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
 
         # Add arc bottom left
         c1 = v2(now_x + radius_now, now_y) # center of the first arc
-        add_arc(board, c1, radius_now, 90, 90 + angle, layer, t_width)
+        add_arc(board, c1, radius_now, 90, 90 + 90, layer, t_width)
         now_x = now_x + radius_now
         now_y = now_y + radius_now
 
@@ -338,7 +390,7 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
 
         # Add arc top left
         c4 = v2(now_x, now_y + radius_now)
-        add_arc(board, c4, radius_now, 270 - angle, 270, layer, t_width)
+        add_arc(board, c4, radius_now, 270, 270 - 90, layer, t_width)
         now_x = now_x - radius_now
         now_y = now_y + radius_now
 
@@ -467,56 +519,114 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
         create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
         return
 
-    radius = min(r_corner, w_length // 2, w_height // 2)
+    # radius = min(r_corner, w_length // 2, w_height // 2)
     t_width = track_width
     Clearance = clearance
-
-    f_length = w_length - 2 * radius
-    f_height = w_height - 2 * radius
-
     track_spacing = track_spacing
-    radius_now = radius + Clearance + (t_width // 2)
 
     ax, ay = center.x, center.y
-    now_x = ax - (w_length // 2) - Clearance - (t_width // 2)
-    now_y = ay - (f_height // 2)
 
-    for _ in range(n):
+    rounded = r_corner > 0
+
+    trace_offset = Clearance + (t_width // 2)
+    outward_increment = t_width + track_spacing
+
+    half_length = w_length // 2
+    half_height = w_height // 2
+
+    #radius_now = radius + Clearance + (t_width // 2)
+
+    # First turn centerline rectangle
+    # Edges defining the centerline of the rectangle formed by the first (inner) turn
+    left = ax - half_length - trace_offset
+    right = ax + half_length + trace_offset
+    top = ay - half_height - trace_offset
+    bottom = ay + half_height + trace_offset
+
+
+    current_length = right - left
+    current_height = bottom - top
+    radius_now = 0
+
+    # raise if radius_now is greater than half the length or height
+    if rounded:
+        radius_now = r_corner + trace_offset
+        if (2 * radius_now > current_height or
+            2 * radius_now > current_length):
+            wx.MessageBox("Corner radius too large. \n"
+                          "Reduce radius or trace width.",
+                          "Geometry Error",
+                          wx.OK | wx.ICON_ERROR)
+            return
+
+    # start at left top
+    now_x = left
+    now_y = top + trace_offset
+
+    for turn in range(n):
         # add a slight offset for the first turn to prevent overlap
         first_turn_offset = 0
-        if _ == 0:
-            first_turn_offset = t_width // 2
+        if turn == 0:
+            first_turn_offset = (t_width // 2)
 
+        # Left trace
+        # Create trace from top to bottom on the left side
+        add_track(board, v2(now_x, now_y + first_turn_offset), v2(now_x, bottom - radius_now), layer, t_width)
+        now_y = bottom - radius_now
 
-        add_track(board, v2(now_x, now_y + first_turn_offset), v2(now_x, now_y + f_height), layer, t_width)
-        now_y = now_y + f_height
+        if rounded:
+            arc_center = v2(now_x + radius_now, now_y)
+            add_arc(board, arc_center, radius_now, 180, 90, layer, t_width)
+            now_x = now_x + radius_now
+            now_y = now_y + radius_now
 
-        add_arc(board, v2(now_x + radius_now, now_y), radius_now, 90, 180, layer, t_width)
-        now_x = now_x + radius_now
-        now_y = now_y + radius_now
+        # Bottom trace
+        # Create trace from left to right on the bottom side
+        add_track(board, v2(now_x, now_y), v2(right - radius_now, now_y), layer, t_width)
+        now_x = right - radius_now
 
-        add_track(board, v2(now_x, now_y), v2(now_x + f_length, now_y), layer, t_width)
-        now_x = now_x + f_length
+        if rounded:
+            arc_center = v2(now_x, now_y - radius_now)
+            add_arc(board, arc_center, radius_now, 90, 0, layer, t_width)
+            now_x = now_x + radius_now
+            now_y = now_y - radius_now
 
-        add_arc(board, v2(now_x, now_y - radius_now), radius_now, 0, 90, layer, t_width)
-        now_x = now_x + radius_now
-        now_y = now_y - radius_now
+        # Right trace
+        # Create trace from bottom to top on the right side
+        add_track(board, v2(now_x, now_y), v2(now_x, top + radius_now), layer, t_width)
+        now_y = top + radius_now
 
-        add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
-        now_y = now_y - f_height
+        if rounded:
+            arc_center = v2(now_x - radius_now, now_y)
+            add_arc(board, arc_center, radius_now, 360, 270, layer, t_width)
+            now_x = now_x - radius_now
+            now_y = now_y - radius_now
 
-        add_arc(board, v2(now_x - radius_now, now_y), radius_now, 270, 360, layer, t_width)
-        now_x = now_x - radius_now
-        now_y = now_y - radius_now
+        # Top trace
+        # Create trace from right to left on the top side
+        next_left = left - outward_increment
+        add_track(board, v2(now_x, now_y), v2(next_left + radius_now, now_y), layer, t_width)
+        now_x = next_left + radius_now
 
-        add_track(board, v2(now_x, now_y), v2(now_x - f_length - t_width - track_spacing, now_y), layer, t_width)
-        now_x = now_x - f_length - t_width - track_spacing
+        if rounded:
+            arc_center = v2(now_x, now_y + radius_now)
+            add_arc(board, arc_center, radius_now, 270, 180, layer, t_width)
+            now_x = now_x - radius_now
+            now_y = now_y + radius_now
 
-        add_arc(board, v2(now_x, now_y + radius_now), radius_now, 180, 270, layer, t_width)
-        now_x = now_x - radius_now
-        now_y = now_y + radius_now
+            # Increment the radius for the next turn
+            radius_now += track_spacing + t_width
 
-        radius_now = radius_now + track_spacing + t_width
+        # Extend the rectangle outward for the next turn
+        left -= outward_increment
+        right += outward_increment
+        top -= outward_increment
+        bottom += outward_increment
+
+        # Final extension for Left-Top start
+        if not rounded:
+            if turn == n - 1:
+                add_track(board, v2(now_x, now_y), v2(now_x, center.y - half_height), layer, track_width)
 
 
 # ---------------------- Action plugin ----------------------
