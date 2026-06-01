@@ -35,6 +35,26 @@ def v2(x, y):
     """
     return pcbnew.VECTOR2I(int(x), int(y))
 
+def transform_point(x, y, center, mirror_x=False, mirror_y=False):
+    """Return a KiCad VECTOR2I point from (x, y), casting to ints (nm units).
+    :param x: X coordinate
+    :type x: float
+    :param y: Y coordinate
+    :type y: float
+    """
+    if mirror_y:
+        x = 2 * center.x - x
+    if mirror_x:
+        y = 2 * center.y - y
+    return pcbnew.VECTOR2I(int(x), int(y))
+
+def transform_angle(a, mirror_x=False, mirror_y=False):
+    if mirror_y:
+        a = 180 - a
+    if mirror_x:
+        a = -a
+    return a % 360
+
 def add_track(board, p1, p2, layer, width):
     """Add a straight copper TRACK segment on the board.
     :param board: Current board instance.
@@ -54,36 +74,116 @@ def add_track(board, p1, p2, layer, width):
     t.SetLayer(layer); t.SetWidth(max(width, 1))  # ensure nonzero width
     board.Add(t)
 
-def add_arc(board, center, radius, ang_start_deg, ang_end_deg, layer, width):
-    """Create a circular arc by start/mid/end points. Angles in degrees (0=+x, CCW positive).
-    :param board: Current board instance
-    :type: pcbnew.BOARD
-    :param center: Center point of the arc on board (internal units, nm)
-    :type: pcbnew.VECTOR2I
-    :param radius: Radius of the arc measured from the center point (internal units, nm)
-    :type: float
-    :param ang_start_deg: Start angle of the arc in degrees. O degrees points in the +X direction.
-                          Positive angles are counter-clockwise.TODO confirm if ccw or cw
-    :type: float
-    :param ang_end_deg: End angle of the arc in degrees. O degrees points in the +X direction.
-                          Positive angles are counter-clockwise.
-    :type: float
-    :param layer: Target KiCad layer ID (e.g., pcbnew.F_Cu).
-    :type layer: int
-    :param width: Width of straight copper TRACK segment (mm).
-    :type width: float
-    :rtype: None
+# def add_arc(board, center, radius, ang_start_deg, ang_end_deg, layer, width):
+#     """Create a circular arc by start/mid/end points. Angles in degrees (0=+x, CCW positive).
+#     :param board: Current board instance
+#     :type: pcbnew.BOARD
+#     :param center: Center point of the arc on board (internal units, nm)
+#     :type: pcbnew.VECTOR2I
+#     :param radius: Radius of the arc measured from the center point (internal units, nm)
+#     :type: float
+#     :param ang_start_deg: Start angle of the arc in degrees. O degrees points in the +X direction.
+#                           Positive angles are counter-clockwise.TODO confirm if ccw or cw
+#     :type: float
+#     :param ang_end_deg: End angle of the arc in degrees. O degrees points in the +X direction.
+#                           Positive angles are counter-clockwise.
+#     :type: float
+#     :param layer: Target KiCad layer ID (e.g., pcbnew.F_Cu).
+#     :type layer: int
+#     :param width: Width of straight copper TRACK segment (mm).
+#     :type width: float
+#     :rtype: None
+#     """
+#     a1 = d2r(ang_start_deg)
+#     a3 = d2r(ang_end_deg)
+#     a2 = d2r((ang_start_deg + ang_end_deg) / 2.0)
+#     start = v2(center.x + radius * math.cos(a1), center.y + radius * math.sin(a1))
+#     mid   = v2(center.x + radius * math.cos(a2), center.y + radius * math.sin(a2))
+#     end   = v2(center.x + radius * math.cos(a3), center.y + radius * math.sin(a3))
+#     arc = pcbnew.PCB_ARC(board)
+#     arc.SetLayer(layer); arc.SetWidth(max(width, 1))
+#     arc.SetStart(start); arc.SetMid(mid); arc.SetEnd(end)
+#     board.Add(arc)
+
+def arc_points_from_center(center, radius, angle_start_deg, angle_end_deg):
     """
-    a1 = d2r(ang_start_deg)
-    a3 = d2r(ang_end_deg)
-    a2 = d2r((ang_start_deg + ang_end_deg) / 2.0)
-    start = v2(center.x + radius * math.cos(a1), center.y + radius * math.sin(a1))
-    mid   = v2(center.x + radius * math.cos(a2), center.y + radius * math.sin(a2))
-    end   = v2(center.x + radius * math.cos(a3), center.y + radius * math.sin(a3))
+    Compute start, mid, and end points for a circular arc.
+
+    Uses KiCad-style board coordinates:
+    0 deg = +X/right
+    90 deg = +Y/down
+    180 deg = left
+    270 deg = up
+
+    The midpoint is chosen on the shortest sweep between start and end.
+    """
+
+    # Compute shortest signed angular sweep
+    delta = (angle_end_deg - angle_start_deg) % 360
+
+    if delta > 180:
+        delta -= 360
+
+    angle_mid_deg = angle_start_deg + delta / 2.0
+
+    def point_at(angle_deg):
+        angle_rad = math.radians(angle_deg)
+        return v2(
+            int(round(center.x + radius * math.cos(angle_rad))),
+            int(round(center.y + radius * math.sin(angle_rad)))
+        )
+
+    start = point_at(angle_start_deg)
+    mid   = point_at(angle_mid_deg)
+    end   = point_at(angle_end_deg)
+
+    return start, mid, end
+
+def add_arc_points(board, start, mid, end, layer, width):
+    """
+    Add a PCB arc using explicit start, mid, and end points.
+
+    :param board: Current board instance.
+    :type board: pcbnew.BOARD
+    :param start: Arc start point.
+    :type start: pcbnew.VECTOR2I
+    :param mid: Arc midpoint defining curvature.
+    :type mid: pcbnew.VECTOR2I
+    :param end: Arc end point.
+    :type end: pcbnew.VECTOR2I
+    :param layer: Target KiCad layer.
+    :type layer: int
+    :param width: Arc track width in internal units.
+    :type width: int
+    """
     arc = pcbnew.PCB_ARC(board)
-    arc.SetLayer(layer); arc.SetWidth(max(width, 1))
-    arc.SetStart(start); arc.SetMid(mid); arc.SetEnd(end)
+    arc.SetLayer(layer)
+    arc.SetWidth(max(width, 1))
+    arc.SetStart(start)
+    arc.SetMid(mid)
+    arc.SetEnd(end)
     board.Add(arc)
+
+def add_arc_transformed_points(board, center, radius,
+                               angle_start_deg, angle_end_deg,
+                               layer, width,
+                               mirror_center,
+                               mirror_x=False,
+                               mirror_y=False):
+    """
+    Add an arc after transforming its start/mid/end points.
+
+    This avoids transforming arc angles directly.
+    """
+
+    start, mid, end = arc_points_from_center(
+        center, radius, angle_start_deg, angle_end_deg)
+
+    start_transformed = transform_point(start.x, start.y, mirror_center, mirror_x, mirror_y)
+    mid_transformed   = transform_point(mid.x,   mid.y,   mirror_center, mirror_x, mirror_y)
+    end_transformed   = transform_point(end.x,   end.y,   mirror_center, mirror_x, mirror_y)
+
+    add_arc_points(board, start_transformed, mid_transformed, end_transformed, layer, width)
 
 def layer_id(board, name):
     """Resolve a human-readable layer name to a KiCad layer ID.
@@ -199,6 +299,17 @@ class ParamsDialog(wx.Dialog):
         start_box.Add(self.rb_top); start_box.Add(self.rb_center); start_box.Add(self.rb_bottom)
         s.Add(start_box, 0, wx.EXPAND | wx.BOTTOM, 6)
 
+        # Mirror options check box
+        mirror_box = wx.StaticBoxSizer(wx.StaticBox(p, label="Mirror"), wx.HORIZONTAL)
+
+        self.mirror_x_cb = wx.CheckBox(p, label="Mirror X")
+        self.mirror_y_cb = wx.CheckBox(p, label="Mirror Y")
+
+        mirror_box.Add(self.mirror_x_cb, 0, wx.RIGHT, 10)
+        mirror_box.Add(self.mirror_y_cb, 0)
+
+        s.Add(mirror_box, 0, wx.EXPAND | wx.TOP, 6)
+
         # ---------------------- Parameter diagram (no scaling) ----------------------
         diag_box = wx.StaticBoxSizer(wx.VERTICAL, p, "Parameter diagram")
         self._diag_bmp = wx.StaticBitmap(p, bitmap=wx.NullBitmap)
@@ -241,13 +352,14 @@ class ParamsDialog(wx.Dialog):
         """Return parameters in mm plus the captured center in nm (or None)."""
         def f(v): return float(v)
         start = 1  # default Left-Center
+        if self.rb_top.GetValue(): start = 0
+        if self.rb_bottom.GetValue(): start = 2
         # r = 0.0
         if self.corner_choice.GetSelection() == 0:
             r = float(self.radius_ctrl.GetValue())
         else:
             r = 0.0
-        if self.rb_top.GetValue(): start = 0
-        if self.rb_bottom.GetValue(): start = 2
+
         return dict(
             cx_mm=f(self.cx.GetValue()),
             cy_mm=f(self.cy.GetValue()),
@@ -260,6 +372,8 @@ class ParamsDialog(wx.Dialog):
             n=int(float(self.turns.GetValue())),
             start=start,
             layer_name=self.layer_choice.GetStringSelection(),
+            mirror_x=self.mirror_x_cb.GetValue(),
+            mirror_y = self.mirror_y_cb.GetValue(),
             center_nm=self.center_nm,  # remains None → Run() uses entered mm
         )
 
@@ -282,7 +396,8 @@ class ParamsDialog(wx.Dialog):
 # ---------------------- Geometry routines ----------------------
 def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                        w_length: int, w_height: int, r_corner:int, clearance: int,
-                       track_width: int, track_spacing: int, n: int):
+                       track_width: int, track_spacing: int, n: int, mirror_x = False,
+                       mirror_y = False):
     """Draw a rectangle spiral starting from the left-center. All internal geometry is integer nanometers.
 
     :param board: Current board instance
@@ -308,106 +423,145 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     :type: int (internal units, nm)
     """
 
-    radius = min(r_corner, w_length // 2, w_height // 2)
-    t_width = track_width
-    Clearance = clearance # spacing between the inner core and inner turn
+    #radius = min(r_corner, w_length // 2, w_height // 2)
+    trace_width = track_width
+    clearance = clearance # spacing between the inner core and inner turn
+    trace_spacing = track_spacing  # Spacing between the turns
 
-    f_length = w_length - 2 * radius # length of the straight portion of the trace (placed horizontally)
-    f_height = w_height - 2 * radius # length of the straight portion of the trace (placed vertically)
+    turns = n  # number of turns
 
-    t_spacing = track_spacing # Spacing between the turns
-    windings = n # number of turns
+    center_x, center_y = center.x, center.y  # center point (x,y) of the winding
 
-    ax, ay = center.x, center.y # center point (x,y) of the winding
-    now_x = ax - (w_length // 2) - Clearance - (t_width // 2) # Starting point of the trace on the x-axis
-    now_y = ay # Starting point of the trace on the y-axis
+    trace_offset = clearance + (trace_width  // 2)
+    outward_increment = trace_width + trace_spacing
+    if turns == 1:
+        outward_increment = 0
+
+    half_length = w_length // 2
+    half_height = w_height // 2
+
+    # First turn centerline rectangle
+    # Edges defining the centerline of the rectangle formed by the first (inner) turn
+    left = center_x - half_length - trace_offset
+    right = center_x + half_length + trace_offset
+    top = center_y - half_height - trace_offset
+    bottom = center_y + half_height + trace_offset
+
+    current_length = right -left
+    current_height = bottom -top
+
+    radius_now = r_corner + trace_offset
+    if (2 * radius_now > current_height or
+            2 * radius_now > current_length):
+        wx.MessageBox("Corner radius too large. \n"
+                      "Reduce radius or trace width.",
+                      "Geometry Error",
+                      wx.OK | wx.ICON_ERROR)
+        return
+
+    now_x = left # Starting point of the trace on the x-axis
+    now_y = center_y # Starting point of the trace on the y-axis
+    if turns == 1:
+        offset = (trace_width + trace_spacing) // 2
+        now_y = center_y + offset
+        radius_now = min(radius_now, w_height // 2 , w_length // 2)
     #TODO resolve first turn arc clearance issue
     # The arc and the corners of the core touches or lacks correct clearance
-    radius_now = radius + Clearance + (t_width // 2)  # adjusted radius of the first arc
 
     angle = 90
-    rad_inc1 = (t_spacing // 2) + (t_width // 2) # increment for last arc in each turn for n > 1
-    rad_inc2 = rad_inc1
 
-    limit = (w_height // 2) + Clearance + (t_width // 2)
-    if (radius_now + rad_inc1) > limit:
-        rad_inc1 = limit - radius_now
-        rad_inc2 = rad_inc2 - rad_inc1
-
-    if windings == 1:
-        now_y = now_y + (t_width // 2) + (t_spacing // 2)
-        rad_inc1 = 0; rad_inc2 = 0
-
-    # radius_now > ((w_height // 2) + Clearance - (t_spacing // 2)):
-    if radius_now > ((w_height // 2) + Clearance + (t_width // 2)):
-        ratio = 1.0 - float(((w_height // 2) + Clearance - (t_spacing // 2))) / float(radius_now)
-        ratio = max(-1.0, min(1.0, ratio))
-        angle = int(round(180.0 * math.acos(ratio) / math.pi))
-
-    for _ in range(windings):
+    for turn in range(turns):
         if angle == 90:
-            p1 = v2(now_x, now_y) # Start point for initial straight trace
-            p2 = v2(now_x, now_y + (f_height // 2)) # End point for initial straight trace
-            if windings == 1: #TODO maybe also adjust start point
-                p2 = v2(p2.x, p2.y - ((t_width // 2) - (t_spacing // 2))) # Adjust end point for single turn
-            add_track(board, p1, p2, layer, t_width)
-            now_y = now_y + (f_height // 2)
-            if windings == 1:
-                now_y = now_y - (t_width // 2) - (t_spacing // 2)
+            start_position = transform_point(now_x, now_y, center, mirror_x, mirror_y) # Start point for initial straight trace
+            end_position = transform_point(now_x, bottom - radius_now, center, mirror_x, mirror_y) # End point for initial straight trace
+            # if turns == 1: #TODO maybe also adjust start point
+            #     start_position = transform_point(now_x, now_y + 3*trace_width // 4, center, mirror_x, mirror_y) # Adjust start point for single turn
+            add_track(board, start_position, end_position, layer, trace_width)
+            now_y = bottom - radius_now
+            # if windings == 1:
+            #     now_y = now_y - (t_width // 2) - (t_spacing // 2)
 
         # Add arc bottom left
-        c1 = v2(now_x + radius_now, now_y) # center of the first arc
-        add_arc(board, c1, radius_now, 90, 90 + 90, layer, t_width)
+        arc_center = v2(now_x + radius_now, now_y) # center of the first arc
+        add_arc_transformed_points(board, arc_center, radius_now, 180, 90,
+                                   layer, trace_width, center, mirror_x, mirror_y)
         now_x = now_x + radius_now
         now_y = now_y + radius_now
 
+        # Bottom trace
         # Add straight trace (placed horizontally on the lower side)
-        add_track(board, v2(now_x, now_y), v2(now_x + f_length, now_y), layer, t_width)
-        now_x = now_x + f_length
+        start_position = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_position = transform_point(right - radius_now, now_y, center, mirror_x, mirror_y)
+        add_track(board, start_position, end_position, layer, trace_width)
+
+        now_x = right - radius_now
 
         # Add arc (curved trace) bottom right
-        c2 = v2(now_x, now_y - radius_now)
-        add_arc(board, c2, radius_now, 0, 90, layer, t_width)
+        arc_center = v2(now_x, now_y - radius_now)
+        add_arc_transformed_points(board, arc_center, radius_now, 90, 0,
+                                   layer, trace_width, center, mirror_x, mirror_y)
         now_x = now_x + radius_now
         now_y = now_y - radius_now
 
+        # Right trace
         # Add straight trace (placed vertically on the right side)
-        add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
-        now_y = now_y - f_height
+        start_position = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_position = transform_point(now_x, top + radius_now, center, mirror_x, mirror_y)
+        add_track(board, start_position, end_position, layer, trace_width)
+        now_y = top + radius_now
 
         # Add arc top right
-        c3 = v2(now_x - radius_now, now_y)
-        add_arc(board, c3, radius_now, 270, 360, layer, t_width)
+        arc_center = v2(now_x - radius_now, now_y)
+        add_arc_transformed_points(board, arc_center, radius_now, 0,
+                                   270, layer, trace_width, center, mirror_x, mirror_y)
         now_x = now_x - radius_now
         now_y = now_y - radius_now
 
+        # Top trace
         # Add straight trace (placed horizontally on the upper side)
-        add_track(board, v2(now_x, now_y), v2(now_x - f_length - rad_inc2, now_y), layer, t_width)
-        now_x = now_x - f_length - rad_inc2
+        next_left = left - outward_increment
+        #radius_now = radius_now + outward_increment // 2  # Increment the radius of the arc to space out the next turn
+
+        start_position = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_position = transform_point(next_left + radius_now, now_y, center, mirror_x, mirror_y)
+        add_track(board, start_position, end_position, layer, track_width)
+        now_x = next_left + radius_now
 
 
-        radius_now = radius_now + rad_inc1 # Increment the radius of the arc to space out the next turn
+        #radius_now = radius_now + outward_increment # Increment the radius of the arc to space out the next turn
 
         # Add arc top left
-        c4 = v2(now_x, now_y + radius_now)
-        add_arc(board, c4, radius_now, 270, 270 - 90, layer, t_width)
+        arc_center = v2(now_x, now_y + radius_now)
+        add_arc_transformed_points(board, arc_center, radius_now, 270,
+                                   180, layer, trace_width, center, mirror_x, mirror_y)
         now_x = now_x - radius_now
         now_y = now_y + radius_now
+        radius_now += outward_increment // 2
+        # Extend the rectangle outward for the next turn
+        left -= outward_increment
+        right += outward_increment
+        top -= outward_increment
+        bottom += outward_increment
 
         if angle == 90:
-            p3 = v2(now_x, now_y)
-            p4 = v2(now_x, ay)
-            if windings == 1:
-                p4 = v2(p4.x, p4.y - ((t_width // 2) + (t_spacing // 2)))
-            add_track(board, p3, p4, layer, t_width)
-            now_y = ay
+            start_position = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+            end_position = transform_point(now_x, bottom - radius_now, center, mirror_x, mirror_y)
+            if turn == turns -1:
+                end_position = transform_point(now_x, center_y, center, mirror_x, mirror_y)
+            if turns == 1:
+                end_position = transform_point(now_x, center_y - offset, center, mirror_x, mirror_y)
+            add_track(board, start_position, end_position, layer, track_width)
+            now_y = bottom - radius_now
 
-        radius_now = radius_now + rad_inc2
+        #radius_now = radius_now + rad_inc2
+
+
 
 
 def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                        w_length: int, w_height: int, r_corner: int, clearance: int,
-                       track_width: int, track_spacing: int, n: int):
+                       track_width: int, track_spacing: int, n: int, mirror_x = False,
+                       mirror_y = False):
     """Draw a rectangle spiral starting from the left-top. All internal geometry is integer nanometers.
 
     :param board: Current board instance
@@ -432,65 +586,185 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     :param n: number of turns
     :type: int (internal units, nm)
     """
-    if n == 1:
-        create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
-        return
+    # if n == 1:
+    #     create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
+    #     return
 
-    radius = min(r_corner, w_length // 2, w_height // 2)
+    #radius = min(r_corner, w_length // 2, w_height // 2)
     t_width = track_width
     Clearance = clearance
+    track_spacing = track_spacing
 
-    f_length = w_length - 2 * radius
-    f_height = w_height - 2 * radius
+    center_x, center_y = center.x, center.y
 
-    t_spacing = track_spacing
-    radius_now = radius + Clearance + (t_width // 2)
+    rounded = r_corner > 0
 
-    ax, ay = center.x, center.y
-    now_x = ax - (f_length // 2)
-    now_y = ay + (w_height // 2) + Clearance + (t_width // 2)
+    trace_offset = Clearance + (t_width // 2)
+    outward_increment = t_width + track_spacing
+    if n == 1:
+        outward_increment = t_width // 2
 
-    for _ in range(n):
+    half_length = w_length // 2
+    half_height = w_height // 2
+
+    # radius_now = radius + Clearance + (t_width // 2)
+
+    # First turn centerline rectangle
+    # Edges defining the centerline of the rectangle formed by the first (inner) turn
+    left = center_x - half_length - trace_offset
+    right = center_x + half_length + trace_offset
+    top = center_y - half_height - trace_offset
+    bottom = center_y + half_height + trace_offset
+
+    current_length = right - left
+    current_height = bottom - top
+    radius_now = 0
+
+    # raise if radius_now is greater than half the length or height
+    if rounded:
+        radius_now = r_corner + trace_offset
+        if (2 * radius_now > current_height or
+                2 * radius_now > current_length):
+            wx.MessageBox("Corner radius too large. \n"
+                          "Reduce radius or trace width.",
+                          "Geometry Error",
+                          wx.OK | wx.ICON_ERROR)
+            return
+
+    # start at left top
+    now_x = left + trace_offset
+    now_y = bottom
+
+    for turn in range(n):
         # add a slight offset for the first turn to prevent overlap
         first_turn_offset = 0
-        if _ == 0:
-            first_turn_offset = t_width // 2
+        if turn == 0:
+            first_turn_offset = (t_width // 2)
 
+        # Bottom trace
+        # Create trace from left to right on the bottom side
+        # add_track(board, v2(now_x + first_turn_offset, now_y), v2(right - radius_now, now_y), layer, t_width)
+        start_position = transform_point(now_x + first_turn_offset, now_y, center, mirror_x, mirror_y)
+        end_position = transform_point(right - radius_now, now_y, center, mirror_x, mirror_y)
+        add_track(board, start_position, end_position, layer, track_width)
 
-        add_track(board, v2(now_x + first_turn_offset, now_y), v2(now_x + f_length, now_y), layer, t_width)
-        now_x = now_x + f_length
+        now_x = right - radius_now
 
-        add_arc(board, v2(now_x, now_y - radius_now), radius_now, 0, 90, layer, t_width)
+        arc_center = v2(now_x, now_y - radius_now)
+        add_arc_transformed_points(board, arc_center, radius_now, 90,
+                0, layer, t_width, center, mirror_x, mirror_y)
         now_x = now_x + radius_now
         now_y = now_y - radius_now
 
-        add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
-        now_y = now_y - f_height
+        # Right trace
+        # Create trace from bottom to top on the right side
+        #add_track(board, v2(now_x, now_y), v2(now_x, top + radius_now), layer, t_width)
+        start_position = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_position = transform_point(now_x, top + radius_now, center, mirror_x, mirror_y)
+        add_track(board, start_position, end_position, layer, track_width)
+        now_y = top + radius_now
 
-        add_arc(board, v2(now_x - radius_now, now_y), radius_now, 270, 360, layer, t_width)
+        arc_center = v2(now_x - radius_now, now_y)
+        add_arc_transformed_points(board, arc_center, radius_now, 0,
+                270, layer, t_width, center, mirror_x, mirror_y)
         now_x = now_x - radius_now
         now_y = now_y - radius_now
 
-        add_track(board, v2(now_x, now_y), v2(now_x - f_length, now_y), layer, t_width)
-        now_x = now_x - f_length
+        # Top trace
+        # Create trace from right to left on the top side
+        #add_track(board, v2(now_x, now_y), v2(left + radius_now, now_y), layer, t_width)
+        start_position = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_position = transform_point(left + radius_now, now_y, center, mirror_x, mirror_y)
+        add_track(board, start_position, end_position, layer, track_width)
+        now_x = left + radius_now
 
-        add_arc(board, v2(now_x, now_y + radius_now), radius_now, 180, 270, layer, t_width)
+        arc_center = v2(now_x, now_y + radius_now)
+        add_arc_transformed_points(board, arc_center, radius_now, 270,
+                180, layer, t_width, center, mirror_x, mirror_y)
         now_x = now_x - radius_now
         now_y = now_y + radius_now
 
-        add_track(board, v2(now_x, now_y), v2(now_x, now_y + f_height + t_width + t_spacing), layer, t_width)
-        now_y = now_y + f_height + t_width + t_spacing
+        # Left trace
+        # Create trace at bottom on the left side
+        next_bottom = bottom + outward_increment
+        #add_track(board, v2(now_x, now_y), v2(now_x, next_bottom - radius_now), layer, t_width)
+        start_position = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_position = transform_point(now_x, next_bottom - radius_now, center, mirror_x, mirror_y)
+        add_track(board, start_position, end_position, layer, track_width)
+        now_y = next_bottom - radius_now
 
-        add_arc(board, v2(now_x + radius_now, now_y), radius_now, 90, 180, layer, t_width)
+        # exit for single turn
+        if n == 1:
+            break
+
+        arc_center = v2(now_x + radius_now, now_y)
+        add_arc_transformed_points(board, arc_center, radius_now, 180,
+                90, layer, t_width, center, mirror_x, mirror_y)
         now_x = now_x + radius_now
         now_y = now_y + radius_now
 
-        radius_now = radius_now + t_spacing + t_width
+        # Increment the radius for the next turn
+        #radius_now += track_spacing + t_width
+        radius_now += outward_increment // 2
+
+        # Extend the rectangle outward for the next turn
+        left -= outward_increment
+        right += outward_increment
+        top -= outward_increment
+        bottom += outward_increment
+
+        # # Final extension for Left-Top start
+        # if not rounded:
+        #     if turn == n - 1:
+        #         #add_track(board, v2(now_x, now_y), v2(center_x - half_length, bottom), layer, track_width)
+        #         start_position = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        #         end_position = transform_point(center_x - half_length, bottom, center, mirror_x, mirror_y)
+        #         add_track(board, start_position, end_position, layer, track_width)
+
+
+
+    # for _ in range(n):
+    #     # add a slight offset for the first turn to prevent overlap
+    #     first_turn_offset = 0
+    #     if _ == 0:
+    #         first_turn_offset = t_width // 2
+    #
+    #
+    #     add_track(board, v2(now_x + first_turn_offset, now_y), v2(now_x + f_length, now_y), layer, t_width)
+    #     now_x = now_x + f_length
+    #
+    #     add_arc(board, v2(now_x, now_y - radius_now), radius_now, 0, 90, layer, t_width)
+    #     now_x = now_x + radius_now
+    #     now_y = now_y - radius_now
+    #
+    #     add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
+    #     now_y = now_y - f_height
+    #
+    #     add_arc(board, v2(now_x - radius_now, now_y), radius_now, 270, 360, layer, t_width)
+    #     now_x = now_x - radius_now
+    #     now_y = now_y - radius_now
+    #
+    #     add_track(board, v2(now_x, now_y), v2(now_x - f_length, now_y), layer, t_width)
+    #     now_x = now_x - f_length
+    #
+    #     add_arc(board, v2(now_x, now_y + radius_now), radius_now, 180, 270, layer, t_width)
+    #     now_x = now_x - radius_now
+    #     now_y = now_y + radius_now
+    #
+    #     add_track(board, v2(now_x, now_y), v2(now_x, now_y + f_height + t_width + t_spacing), layer, t_width)
+    #     now_y = now_y + f_height + t_width + t_spacing
+    #
+    #     add_arc(board, v2(now_x + radius_now, now_y), radius_now, 90, 180, layer, t_width)
+    #     now_x = now_x + radius_now
+    #     now_y = now_y + radius_now
+    #
+    #     radius_now = radius_now + t_spacing + t_width
 
 
 def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                     w_length: int, w_height: int, r_corner: int, clearance: int,
-                    track_width: int, track_spacing: int, n: int):
+                    track_width: int, track_spacing: int, n: int, mirror_x = False,
+                    mirror_y = False):
     """Draw a rectangle spiral starting from the left-bottom. All internal geometry is integer nanometers.
 
     :param board: Current board instance
@@ -571,62 +845,69 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
 
         # Left trace
         # Create trace from top to bottom on the left side
-        add_track(board, v2(now_x, now_y + first_turn_offset), v2(now_x, bottom - radius_now), layer, t_width)
+        start_position = transform_point(now_x, now_y + first_turn_offset, center, mirror_x, mirror_y)
+        end_position = transform_point(now_x, bottom - radius_now, center, mirror_x, mirror_y)
+        add_track(board, start_position, end_position, layer, track_width)
         now_y = bottom - radius_now
 
-        if rounded:
-            arc_center = v2(now_x + radius_now, now_y)
-            add_arc(board, arc_center, radius_now, 180, 90, layer, t_width)
-            now_x = now_x + radius_now
-            now_y = now_y + radius_now
+        arc_center = v2(now_x + radius_now, now_y)
+        add_arc_transformed_points(board, arc_center, radius_now, 180, 90,
+                                   layer, t_width, center, mirror_x, mirror_y)
+        now_x = now_x + radius_now
+        now_y = now_y + radius_now
 
         # Bottom trace
         # Create trace from left to right on the bottom side
-        add_track(board, v2(now_x, now_y), v2(right - radius_now, now_y), layer, t_width)
+        start_position = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_position = transform_point(right - radius_now, now_y, center, mirror_x, mirror_y)
+        add_track(board, start_position, end_position, layer, track_width)
         now_x = right - radius_now
 
-        if rounded:
-            arc_center = v2(now_x, now_y - radius_now)
-            add_arc(board, arc_center, radius_now, 90, 0, layer, t_width)
-            now_x = now_x + radius_now
-            now_y = now_y - radius_now
+        arc_center = v2(now_x, now_y - radius_now)
+        add_arc_transformed_points(board, arc_center, radius_now, 90,
+                                   0, layer, t_width, center, mirror_x, mirror_y)
+        now_x = now_x + radius_now
+        now_y = now_y - radius_now
 
         # Right trace
         # Create trace from bottom to top on the right side
-        add_track(board, v2(now_x, now_y), v2(now_x, top + radius_now), layer, t_width)
+        start_position = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_position = transform_point(now_x, top + radius_now, center, mirror_x, mirror_y)
+        add_track(board, start_position, end_position, layer, track_width)
         now_y = top + radius_now
 
-        if rounded:
-            arc_center = v2(now_x - radius_now, now_y)
-            add_arc(board, arc_center, radius_now, 360, 270, layer, t_width)
-            now_x = now_x - radius_now
-            now_y = now_y - radius_now
+        arc_center = v2(now_x - radius_now, now_y)
+        add_arc_transformed_points(board, arc_center, radius_now, 0,
+                                   270, layer, t_width, center, mirror_x, mirror_y)
+        now_x = now_x - radius_now
+        now_y = now_y - radius_now
 
         # Top trace
         # Create trace from right to left on the top side
         next_left = left - outward_increment
-        add_track(board, v2(now_x, now_y), v2(next_left + radius_now, now_y), layer, t_width)
+
+        start_position = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_position = transform_point(next_left + radius_now, now_y, center, mirror_x, mirror_y)
+        add_track(board, start_position, end_position, layer, track_width)
         now_x = next_left + radius_now
 
-        if rounded:
-            arc_center = v2(now_x, now_y + radius_now)
-            add_arc(board, arc_center, radius_now, 270, 180, layer, t_width)
-            now_x = now_x - radius_now
-            now_y = now_y + radius_now
+        arc_center = v2(now_x, now_y + radius_now)
+        add_arc_transformed_points(board, arc_center, radius_now, 270,
+                                   180, layer, t_width, center, mirror_x, mirror_y)
+        now_x = now_x - radius_now
+        now_y = now_y + radius_now
 
-            # Increment the radius for the next turn
-            radius_now += track_spacing + t_width
-
+        radius_now += outward_increment // 2  # Increment the radius for the next turn
         # Extend the rectangle outward for the next turn
         left -= outward_increment
         right += outward_increment
         top -= outward_increment
         bottom += outward_increment
 
-        # Final extension for Left-Top start
-        if not rounded:
-            if turn == n - 1:
-                add_track(board, v2(now_x, now_y), v2(now_x, center.y - half_height), layer, track_width)
+        # # Final extension for Left-Top start
+        # if not rounded:
+        #     if turn == n - 1:
+        #         add_track(board, v2(now_x, now_y), v2(now_x, center.y - half_height), layer, track_width)
 
 
 # ---------------------- Action plugin ----------------------
@@ -675,12 +956,18 @@ class PlanarRectSpiralLC(pcbnew.ActionPlugin):
         # 4) Draw spiral
         tx = pcbnew.Transaction(board, "Planar Winding") if hasattr(pcbnew, "Transaction") else None
         try:
+            # if start == 2:
+            #     create_left_bottom(board, layer, center, sx, sy, r, cin, w, sp, n, mirror_x=P["mirror_x"],
+            #     mirror_y=P["mirror_y"])
             if start == 0:
-                create_left_top(board, layer, center, sx, sy, r, cin, w, sp, n)
+                create_left_top(board, layer, center, sx, sy, r, cin, w, sp, n, mirror_x=P["mirror_x"],
+                            mirror_y=P["mirror_y"])
             elif start == 2:
-                create_left_bottom(board, layer, center, sx, sy, r, cin, w, sp, n)
+                create_left_bottom(board, layer, center, sx, sy, r, cin, w, sp, n, mirror_x=P["mirror_x"],
+                mirror_y=P["mirror_y"])
             else:
-                create_left_center(board, layer, center, sx, sy, r, cin, w, sp, n)
+                create_left_center(board, layer, center, sx, sy, r, cin, w, sp, n,
+                                   mirror_x=P["mirror_x"], mirror_y=P["mirror_y"])
         finally:
             if tx: tx.Commit()
         pcbnew.Refresh()
