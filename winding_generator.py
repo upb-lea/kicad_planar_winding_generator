@@ -486,9 +486,9 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     :param n: number of turns
     :type: int (internal units, nm)
     """
-    if n == 1:
-        create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
-        return
+    # if n == 1:
+    #     create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
+    #     return
 
     radius = min(r_corner, w_length // 2, w_height // 2)
     t_width = track_width
@@ -508,29 +508,40 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
         # add a slight offset for the first turn to prevent overlap
         first_turn_offset = 0
         if _ == 0:
-            first_turn_offset = t_width // 2
+            first_turn_offset = t_width // 2 - radius
 
-
+        # Bottom straight
         add_track(board, v2(now_x + first_turn_offset, now_y), v2(now_x + f_length, now_y), layer, t_width)
         now_x = now_x + f_length
 
+        # Arc bottom-right
         add_arc(board, v2(now_x, now_y - radius_now), radius_now, 0, 90, layer, t_width)
         now_x = now_x + radius_now
         now_y = now_y - radius_now
 
+        # Right vertical straight
         add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
         now_y = now_y - f_height
 
+        # Arc top-right
         add_arc(board, v2(now_x - radius_now, now_y), radius_now, 270, 360, layer, t_width)
         now_x = now_x - radius_now
         now_y = now_y - radius_now
 
+        # Top straight
         add_track(board, v2(now_x, now_y), v2(now_x - f_length, now_y), layer, t_width)
         now_x = now_x - f_length
 
+        # Arc top-left
         add_arc(board, v2(now_x, now_y + radius_now), radius_now, 180, 270, layer, t_width)
         now_x = now_x - radius_now
         now_y = now_y + radius_now
+
+        # Left straight
+        # Break here for single turn
+        if n == 1:
+            add_track(board, v2(now_x, now_y), v2(now_x, now_y + f_height + t_width // 2 + t_spacing // 2), layer, t_width)
+            break
 
         add_track(board, v2(now_x, now_y), v2(now_x, now_y + f_height + t_width + t_spacing), layer, t_width)
         now_y = now_y + f_height + t_width + t_spacing
@@ -569,9 +580,9 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
     :param n: number of turns
     :type: int (internal units, nm)
     """
-    if n == 1:
-        create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
-        return
+    # if n == 1:
+    #     create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
+    #     return
 
     radius = min(r_corner, w_length // 2, w_height // 2)
     t_width = track_width
@@ -591,33 +602,46 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
         # add a slight offset for the first turn to prevent overlap
         first_turn_offset = 0
         if _ == 0:
-            first_turn_offset = t_width // 2
+            first_turn_offset = t_width // 2 - radius
 
-
+        # Left straight
         add_track(board, v2(now_x, now_y + first_turn_offset), v2(now_x, now_y + f_height), layer, t_width)
         now_y = now_y + f_height
 
+        # Arc bottom-left
         add_arc(board, v2(now_x + radius_now, now_y), radius_now, 90, 180, layer, t_width)
         now_x = now_x + radius_now
         now_y = now_y + radius_now
 
+        # Bottom straight
         add_track(board, v2(now_x, now_y), v2(now_x + f_length, now_y), layer, t_width)
         now_x = now_x + f_length
 
+        # Arc bottom-right
         add_arc(board, v2(now_x, now_y - radius_now), radius_now, 0, 90, layer, t_width)
         now_x = now_x + radius_now
         now_y = now_y - radius_now
 
+        # Right vertical straight
         add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
         now_y = now_y - f_height
 
+        # Arc top-right
         add_arc(board, v2(now_x - radius_now, now_y), radius_now, 270, 360, layer, t_width)
         now_x = now_x - radius_now
         now_y = now_y - radius_now
 
+        # Top straight
+        # Break here for single turn
+        if n == 1:
+            add_track(board, v2(now_x, now_y), v2(now_x - f_length - t_width // 2 - track_spacing // 2, now_y), layer, t_width)
+            break
+
+        # Top straight
         add_track(board, v2(now_x, now_y), v2(now_x - f_length - t_width - track_spacing, now_y), layer, t_width)
         now_x = now_x - f_length - t_width - track_spacing
 
+        # Arc top-left
         add_arc(board, v2(now_x, now_y + radius_now), radius_now, 180, 270, layer, t_width)
         now_x = now_x - radius_now
         now_y = now_y + radius_now
