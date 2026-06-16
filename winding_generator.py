@@ -658,7 +658,7 @@ def create_left_top_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcb
     :type: int (internal units, nm)
     :param n: number of turns
     :type: int (internal units, nm)
-    
+
     """
 
     if n < 1:
@@ -754,7 +754,7 @@ def create_left_bottom_right_angled(board: "pcbnew.BOARD",
     The winding grows outward from the inner window.
 
     All units are internal KiCad units (nm).
-    
+
     :param board: Current board instance
     :type: pcbnew.BOARD
     :param layer: Target KiCad layer ID (e.g., pcbnew.F_Cu).
