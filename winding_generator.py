@@ -86,7 +86,30 @@ def add_arc(board, center, radius, ang_start_deg, ang_end_deg, layer, width):
     board.Add(arc)
 
 def add_rect(board, x, y, w, h, layer):
-    """Add a filled polygon rect. All arguments in internal units (nm)."""
+    """Add a filled polygon rect. All arguments in internal units (nm).
+
+    The rectangle is created as a filled `pcbnew.PCB_SHAPE` polygon using
+    four corner points. The point `(x, y)` defines the top-left corner of
+    the rectangle in KiCad board coordinates. The rectangle extends in the
+    positive X direction by `w` and in the positive Y direction by `h`.
+
+    All coordinate and dimension arguments are expected to be in KiCad
+    internal units, nanometers.
+
+    :param board: Current board instance.
+    :type board: pcbnew.BOARD
+    :param x: X-coordinate of the rectangle's top-left corner, in internal KiCad units.
+    :type x: int
+    :param y: Y-coordinate of the rectangle's top-left corner, in internal KiCad units.
+    :type y: int
+    :param w: Width of the rectangle in the X direction, in internal KiCad units.
+    :type w: int
+    :param h: Height of the rectangle in the Y direction, in internal KiCad units.
+    :type h: int
+    :param layer: Target KiCad layer ID, for example `pcbnew.F_Cu`.
+    :type layer: int
+    :rtype: None
+    """
     poly = pcbnew.PCB_SHAPE(board)
     poly.SetShape(pcbnew.SHAPE_T_POLY)
     poly.SetFilled(True)
@@ -101,6 +124,36 @@ def add_rect(board, x, y, w, h, layer):
     board.Add(poly)
 
 def add_rect_vertical(board, x, y1, y2, width, layer):
+    """
+    Add a filled vertical rectangular copper segment to the board.
+
+    This helper creates a vertical copper rectangle from a centerline-style
+    definition. The segment centerline is located at X-coordinate `x` and
+    extends vertically from `y1` to `y2`. The copper rectangle is expanded
+    by `width / 2` on both sides of the centerline.
+
+    The rectangle is also extended by `width / 2` beyond both vertical
+    endpoints. This intentional extension allows adjacent horizontal
+    rectangular segments to overlap at corners, producing fully filled
+    right-angled corners without gaps or chamfered-looking edges.
+
+    All coordinate and dimension arguments are expected to be in KiCad
+    internal units, nanometers.
+
+    :param board: Current board instance.
+    :type board: pcbnew.BOARD
+    :param x: X-coordinate of the vertical segment centerline, in internal KiCad units.
+    :type x: int
+    :param y1: Y-coordinate of one endpoint of the vertical centerline, in internal KiCad units.
+    :type y1: int
+    :param y2: Y-coordinate of the other endpoint of the vertical centerline, in internal KiCad units.
+    :type y2: int
+    :param width: Width of the copper segment, in internal KiCad units.
+    :type width: int
+    :param layer: Target KiCad layer ID, for example `pcbnew.F_Cu`.
+    :type layer: int
+    :rtype: None
+    """
     half_width = width // 2
     x0 = x - half_width
     y0 = min(y1, y2) - half_width
@@ -108,6 +161,36 @@ def add_rect_vertical(board, x, y1, y2, width, layer):
     add_rect(board, x0, y0, width, h, layer)
 
 def add_rect_horizontal(board, x1, x2, y, width, layer):
+    """
+    Add a filled horizontal rectangular copper segment to the board.
+
+    This helper creates a horizontal copper rectangle from a centerline-style
+    definition. The segment centerline is located at Y-coordinate `y` and
+    extends horizontally from `x1` to `x2`. The copper rectangle is expanded
+    by `width / 2` on both sides of the centerline.
+
+    The rectangle is also extended by `width / 2` beyond both horizontal
+    endpoints. This intentional extension allows adjacent vertical
+    rectangular segments to overlap at corners, producing fully filled
+    right-angled corners without gaps or chamfered-looking edges.
+
+    All coordinate and dimension arguments are expected to be in KiCad
+    internal units, nanometers.
+
+    :param board: Current board instance.
+    :type board: pcbnew.BOARD
+    :param x1: X-coordinate of one endpoint of the horizontal centerline, in internal KiCad units.
+    :type x1: int
+    :param x2: X-coordinate of the other endpoint of the horizontal centerline, in internal KiCad units.
+    :type x2: int
+    :param y: Y-coordinate of the horizontal segment centerline, in internal KiCad units.
+    :type y: int
+    :param width: Width of the copper segment, in internal KiCad units.
+    :type width: int
+    :param layer: Target KiCad layer ID, for example `pcbnew.F_Cu`.
+    :type layer: int
+    :rtype: None
+    """
     half_width = width // 2
     x0 = min(x1, x2) - half_width
     y0 = y - half_width
@@ -164,7 +247,7 @@ class ParamsDialog(wx.Dialog):
 
         # Parameter names (all mm)
         self.gap    = row("Turn-Core (mm):", "0.30")       # inner clearance
-        self.radius = row("Radius (mm):", "2.00")    # corner radius
+        #self.radius = row("Radius (mm):", "0.50")    # corner radius
         self.twidth = row("Width (mm):", "0.25")     # track width
         self.guard  = row("Turn-Turn (mm):", "0.25")     # track-to-track spacing
 
@@ -178,6 +261,36 @@ class ParamsDialog(wx.Dialog):
         grid.Add(wx.StaticText(p, label="Height <h> (mm)"), 0, wx.ALIGN_CENTER_VERTICAL)
         self.size_y = wx.TextCtrl(p, value="16.0", style=wx.TE_RIGHT); grid.Add(self.size_y, 1, wx.EXPAND)
         props.Add(grid, 0, wx.EXPAND | wx.ALL, 4)
+
+        # -------------------------------------------------
+        # Winding corner type selector
+        # -------------------------------------------------
+        hl_corner = wx.BoxSizer(wx.HORIZONTAL)
+
+        hl_corner.Add(wx.StaticText(p, label="Winding Corner Type"), 0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
+
+        self.corner_choice = wx.Choice(p, choices=["Rounded Corner", "Right Angled"])
+        self.corner_choice.SetSelection(0)
+        self.corner_choice.Bind(wx.EVT_CHOICE, self.on_corner_type_changed)
+        wx.CallAfter(self.update_corner_ui)
+
+        hl_corner.Add(self.corner_choice, 1, wx.EXPAND | wx.RIGHT, 12)
+        props.Add(hl_corner, 0, wx.EXPAND | wx.TOP, 4)
+
+        # -------------------------------------------------
+        # Radius input
+        # -------------------------------------------------
+        self.radius_row = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.radius_label = wx.StaticText(p, label="Radius (mm):")
+        self.radius_row.Add(self.radius_label, 0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
+
+        self.radius_size = wx.TextCtrl(p, value="0.5")
+        self.radius_row.Add(self.radius_size, 1, wx.EXPAND | wx.RIGHT, 12)
+
+        props.Add(self.radius_row, 0, wx.EXPAND | wx.TOP, 4)
 
         # Layer selector
         hl = wx.BoxSizer(wx.HORIZONTAL)
@@ -229,6 +342,20 @@ class ParamsDialog(wx.Dialog):
         # Internal state: captured center (removed mouse capture → always None)
         self.center_nm = None
 
+    def on_corner_type_changed(self, event):
+        self.update_corner_ui()
+
+    def update_corner_ui(self):
+        is_rounded = self.corner_choice.GetSelection() == 0
+
+        self.radius_label.Enable(is_rounded)
+        self.radius_size.Enable(is_rounded)
+
+        if not is_rounded:
+            self.radius_size.SetValue("0.0")
+
+        self.Layout()
+
     def _on_dialog_resize(self, evt):
         evt.Skip()
 
@@ -241,16 +368,25 @@ class ParamsDialog(wx.Dialog):
         start = 1  # default Left-Center
         if self.rb_top.GetValue(): start = 0
         if self.rb_bottom.GetValue(): start = 2
+
+        corner_type = self.corner_choice.GetStringSelection()
+
+        if corner_type == "Rounded Corner":
+            r = float(self.radius_size.GetValue())
+        else:
+            r = 0.0
+
         return dict(
             cx_mm=f(self.cx.GetValue()),
             cy_mm=f(self.cy.GetValue()),
             sx=f(self.size_x.GetValue()),
             sy=f(self.size_y.GetValue()),
-            r=f(self.radius.GetValue()),
+            r=r,
             cin=f(self.gap.GetValue()),
             w=f(self.twidth.GetValue()),
             sp=f(self.guard.GetValue()),
             n=int(float(self.turns.GetValue())),
+            corner_type = corner_type,
             start=start,
             layer_name=self.layer_choice.GetStringSelection(),
             center_nm=self.center_nm,  # remains None → Run() uses entered mm
@@ -580,7 +716,7 @@ def create_left_top_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcb
         # Single turn exit
         # ---------------------------------
         if n == 1:
-            end_x = left #- (t_width // 2) - (track_spacing // 2)
+            end_x = left
             add_rect_horizontal(board, now_x, end_x, now_y, t_width, layer)
             break
 
@@ -694,8 +830,8 @@ def create_left_bottom_right_angled(board: "pcbnew.BOARD",
         # Single turn exit
         # ---------------------------------
         if n == 1:
-            end_x = left #- (t_width // 2) - (track_spacing // 2)
-            add_rect_horizontal(board, now_x, end_x, now_y, t_width, layer)
+            end_y = bottom
+            add_rect_vertical(board, now_x, now_y, end_y, t_width, layer)
             break
 
         # ---------------------------------
@@ -853,13 +989,13 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     :type: int (internal units, nm)
     """
 
+    # if r_corner == 0:
+    #     create_left_center_right_angled(board, layer, center, w_length, w_height, clearance, track_width, track_spacing, n)
+    #     return
+
     if n == 1:
         create_left_center_single(board, layer, center, w_length, w_height,
                                   r_corner, clearance, track_width, track_spacing)
-        return
-
-    if r_corner == 0:
-        create_left_center_right_angled(board, layer, center, w_length, w_height, clearance, track_width, track_spacing, n)
         return
 
     #  Multi-turn path (n > 1)
@@ -972,9 +1108,9 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     #     create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
     #     return
 
-    if r_corner == 0:
-        create_left_bottom_right_angled(board, layer, center, w_length, w_height, clearance, track_width, track_spacing, n)
-        return
+    # if r_corner == 0:
+    #     create_left_bottom_right_angled(board, layer, center, w_length, w_height, clearance, track_width, track_spacing, n)
+    #     return
 
     radius = min(r_corner, w_length // 2, w_height // 2)
     t_width = track_width
@@ -1069,9 +1205,9 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
     # if n == 1:
     #     create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
     #     return
-    if r_corner == 0:
-        create_left_top_right_angled(board, layer, center, w_length, w_height, clearance, track_width, track_spacing, n)
-        return
+    # if r_corner == 0:
+    #     create_left_top_right_angled(board, layer, center, w_length, w_height, clearance, track_width, track_spacing, n)
+    #     return
 
     radius = min(r_corner, w_length // 2, w_height // 2)
     t_width = track_width
@@ -1175,6 +1311,7 @@ class PlanarRectSpiralLC(pcbnew.ActionPlugin):
         n  = max(1, int(P["n"]))
         start = int(P["start"])  # 0=LT, 1=LC, 2=LB
         layer = layer_id(board, P["layer_name"])
+        corner_type = P["corner_type"]
 
         # Optional debug tick at center
         if debug_test:
@@ -1184,12 +1321,49 @@ class PlanarRectSpiralLC(pcbnew.ActionPlugin):
         # 4) Draw spiral
         tx = pcbnew.Transaction(board, "Planar Winding") if hasattr(pcbnew, "Transaction") else None
         try:
-            if start == 0:
-                create_left_top(board, layer, center, sx, sy, r, cin, w, sp, n)
-            elif start == 2:
-                create_left_bottom(board, layer, center, sx, sy, r, cin, w, sp, n)
+            if corner_type == "Rounded Corner":
+
+                if start == 0:
+                    create_left_top(
+                        board, layer, center,
+                        sx, sy, r, cin, w, sp, n)
+
+                elif start == 1:
+                    create_left_center(
+                        board, layer, center,
+                        sx, sy, r, cin, w, sp, n)
+
+                elif start == 2:
+                    create_left_bottom(
+                        board, layer, center,
+                        sx, sy, r, cin, w, sp, n)
+
             else:
-                create_left_center(board, layer, center, sx, sy, r, cin, w, sp, n)
+
+                if start == 0:
+                    create_left_top_right_angled(
+                        board, layer, center,
+                        sx, sy, cin, w, sp, n
+                    )
+
+                elif start == 1:
+                    create_left_center_right_angled(
+                        board, layer, center,
+                        sx, sy, cin, w, sp, n
+                    )
+
+                elif start == 2:
+                    create_left_bottom_right_angled(
+                        board, layer, center,
+                        sx, sy, cin, w, sp, n
+                    )
+            # if start == 0:
+            #     create_left_top(board, layer, center, sx, sy, r, cin, w, sp, n)
+            # elif start == 2:
+            #     create_left_bottom(board, layer, center, sx, sy, r, cin, w, sp, n)
+            # else:
+            #     create_left_center(board, layer, center, sx, sy, r, cin, w, sp, n)
+
         finally:
             if tx: tx.Commit()
         pcbnew.Refresh()
