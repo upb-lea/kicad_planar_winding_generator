@@ -18,9 +18,9 @@ import shutil
 from pathlib import Path
 
 # --- defaults you may change ---
-# DEFAULT_MAIN_PLUGIN = ["action_plugin.py", "gui.py", "geometry.py",
-#                              "drawing.py", "rectangular_windings.py", "rounded_windings.py"]
-DEFAULT_MAIN_PLUGIN = "winding_generator.py"
+DEFAULT_MAIN_PLUGIN = ["action_plugin.py", "gui.py", "geometry.py",
+                             "drawing.py", "rectangular_windings.py", "rounded_windings.py"]
+#DEFAULT_MAIN_PLUGIN = "winding_generator.py"
 DEFAULT_VIA_PLUGIN  = "place_vias.py"
 ICON_TARGET_NAME = "icon.png"
 VIA_ICON_TARGET_NAME = "vias_icon.png"
@@ -173,7 +173,8 @@ def main():
     print(f"\nKiCad plugins dir : {plugins_dir}")
 
     # Install main plugin
-    _install_plugin(repo_root, args.main_source, plugins_dir, args.main_name, args.main_link)
+    for args.main_source in DEFAULT_MAIN_PLUGIN:
+        _install_plugin(repo_root, args.main_source, plugins_dir, args.main_name, args.main_link)
 
     # Install via plugin (optional)
     if not args.no_via:
