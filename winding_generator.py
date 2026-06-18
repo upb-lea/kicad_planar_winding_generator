@@ -211,6 +211,44 @@ def layer_id(board, name):
     lid = board.GetLayerID(name)
     return lid if lid != -1 else pcbnew.F_Cu
 
+def validate_rounded_corner_core_clearance(r_corner, clearance):
+    """
+    Validate that the rounded inner winding corner does not intrude into
+    the rectangular core corner.
+
+    All arguments are in KiCad internal units.
+
+    :param r_corner: User-defined geometric corner radius.
+    :type r_corner: int
+    :param clearance: Required clearance from core to winding.
+    :type clearance: int
+    :return: Tuple ``(ok, message)``. If valid, ``ok`` is True and message is empty.
+             If invalid, ``ok`` is False and message contains the error description.
+    :rtype: tuple[bool, str]
+    """
+
+    if r_corner <= 0:
+        return True, ""
+
+    diagonal = math.sqrt(2.0) * float(r_corner)
+    allowed = float(r_corner + clearance)
+
+    if diagonal > allowed:
+        max_radius = clearance / (math.sqrt(2.0) - 1.0)
+
+        msg = (
+            "Rounded corner radius is too large for the selected core clearance.\n\n"
+            "The inner copper arc would intrude into the core corner region.\n\n"
+            f"Selected radius: {pcbnew.ToMM(r_corner):.3f} mm\n"
+            f"Clearance: {pcbnew.ToMM(clearance):.3f} mm\n"
+            f"Maximum allowed radius: {pcbnew.ToMM(int(max_radius)):.3f} mm\n\n"
+            "Reduce the corner radius or increase the core clearance."
+        )
+
+        return False, msg
+
+    return True, ""
+
 
 # ---------------------- Parameters dialog ----------------------
 class ParamsDialog(wx.Dialog):
@@ -422,6 +460,18 @@ def create_left_center_single(board: "pcbnew.BOARD", layer: int, center: "pcbnew
     :param track_spacing: Minimum spacing between adjacent trace edges
     :type: int (internal units, nm)
     """
+
+    # Validation that the inner winding corner does not intrude into the
+    # rectangular core corner
+    ok, msg = validate_rounded_corner_core_clearance(r_corner, clearance)
+
+    if not ok:
+        wx.MessageBox(
+            msg,
+            "Rounded Corner Geometry Error",
+            wx.OK | wx.ICON_ERROR
+        )
+        return
 
     radius = min(r_corner, w_length // 2, w_height // 2)
     t_width = track_width
@@ -998,6 +1048,18 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
                                   r_corner, clearance, track_width, track_spacing)
         return
 
+    # Validation that the inner winding corner does not intrude into the
+    # rectangular core corner
+    ok, msg = validate_rounded_corner_core_clearance(r_corner, clearance)
+
+    if not ok:
+        wx.MessageBox(
+            msg,
+            "Rounded Corner Geometry Error",
+            wx.OK | wx.ICON_ERROR
+        )
+        return
+
     #  Multi-turn path (n > 1)
     radius = min(r_corner, w_length // 2, w_height // 2)
     t_width = track_width
@@ -1112,6 +1174,18 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     #     create_left_bottom_right_angled(board, layer, center, w_length, w_height, clearance, track_width, track_spacing, n)
     #     return
 
+    # Validation that the inner winding corner does not intrude into the
+    # rectangular core corner
+    ok, msg = validate_rounded_corner_core_clearance(r_corner, clearance)
+
+    if not ok:
+        wx.MessageBox(
+            msg,
+            "Rounded Corner Geometry Error",
+            wx.OK | wx.ICON_ERROR
+        )
+        return
+
     radius = min(r_corner, w_length // 2, w_height // 2)
     t_width = track_width
     Clearance = clearance
@@ -1130,7 +1204,7 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
         # add a slight offset for the first turn to prevent overlap
         first_turn_offset = 0
         if _ == 0:
-            first_turn_offset = t_width // 2 - radius
+            first_turn_offset = t_width // 2
 
         # Bottom straight
         add_track(board, v2(now_x + first_turn_offset, now_y), v2(now_x + f_length, now_y), layer, t_width)
@@ -1209,6 +1283,18 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
     #     create_left_top_right_angled(board, layer, center, w_length, w_height, clearance, track_width, track_spacing, n)
     #     return
 
+    # Validation that the inner winding corner does not intrude into the
+    # rectangular core corner
+    ok, msg = validate_rounded_corner_core_clearance(r_corner, clearance)
+
+    if not ok:
+        wx.MessageBox(
+            msg,
+            "Rounded Corner Geometry Error",
+            wx.OK | wx.ICON_ERROR
+        )
+        return
+
     radius = min(r_corner, w_length // 2, w_height // 2)
     t_width = track_width
     Clearance = clearance
@@ -1227,7 +1313,7 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
         # add a slight offset for the first turn to prevent overlap
         first_turn_offset = 0
         if _ == 0:
-            first_turn_offset = t_width // 2 - radius
+            first_turn_offset = t_width // 2
 
         # Left straight
         add_track(board, v2(now_x, now_y + first_turn_offset), v2(now_x, now_y + f_height), layer, t_width)
