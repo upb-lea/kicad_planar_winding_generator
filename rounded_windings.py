@@ -4,6 +4,7 @@ from drawing import add_track, add_arc
 from geometry import v2
 
 # ----------------------Rounded Geometry routines ----------------------
+# TODO: add validation for radius to avoid intrusion of the track arc into the core corners
 def create_left_center_single(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                                w_length: int, w_height: int, r_corner: int, clearance: int,
                                track_width: int, track_spacing: int):
@@ -290,7 +291,7 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
         # add a slight offset for the first turn to prevent overlap
         first_turn_offset = 0
         if _ == 0:
-            first_turn_offset = t_width // 2 - radius
+            first_turn_offset = t_width // 2
 
         # Bottom straight
         add_track(board, v2(now_x + first_turn_offset, now_y), v2(now_x + f_length, now_y), layer, t_width)
@@ -387,7 +388,7 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
         # add a slight offset for the first turn to prevent overlap
         first_turn_offset = 0
         if _ == 0:
-            first_turn_offset = t_width // 2 - radius
+            first_turn_offset = t_width // 2
 
         # Left straight
         add_track(board, v2(now_x, now_y + first_turn_offset), v2(now_x, now_y + f_height), layer, t_width)
