@@ -18,7 +18,9 @@ import shutil
 from pathlib import Path
 
 # --- defaults you may change ---
-DEFAULT_MAIN_PLUGIN = "action_plugin.py"
+# DEFAULT_MAIN_PLUGIN = ["action_plugin.py", "gui.py", "geometry.py",
+#                              "drawing.py", "rectangular_windings.py", "rounded_windings.py"]
+DEFAULT_MAIN_PLUGIN = "winding_generator.py"
 DEFAULT_VIA_PLUGIN  = "place_vias.py"
 ICON_TARGET_NAME = "icon.png"
 VIA_ICON_TARGET_NAME = "vias_icon.png"
