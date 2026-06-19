@@ -1,10 +1,9 @@
-
+import wx
 import math
 from drawing import add_track, add_arc
-from geometry import v2
+from geometry import v2, validate_rounded_corner_core_clearance
 
 # ----------------------Rounded Geometry routines ----------------------
-# TODO: add validation for radius to avoid intrusion of the track arc into the core corners
 def create_left_center_single(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                                w_length: int, w_height: int, r_corner: int, clearance: int,
                                track_width: int, track_spacing: int):
@@ -33,6 +32,17 @@ def create_left_center_single(board: "pcbnew.BOARD", layer: int, center: "pcbnew
     :param track_spacing: Minimum spacing between adjacent trace edges
     :type: int (internal units, nm)
     """
+
+    # Validation for radius to avoid intrusion of the track arc into the core corners
+    ok, msg = validate_rounded_corner_core_clearance(r_corner, clearance)
+
+    if not ok:
+        wx.MessageBox(
+            msg,
+            "Rounded Corner Geometry Error",
+            wx.OK | wx.ICON_ERROR
+        )
+        return
 
     radius = min(r_corner, w_length // 2, w_height // 2)
     t_width = track_width
@@ -150,6 +160,17 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     :type: int (internal units, nm)
     """
 
+    # Validation for radius to avoid intrusion of the track arc into the core corners
+    ok, msg = validate_rounded_corner_core_clearance(r_corner, clearance)
+
+    if not ok:
+        wx.MessageBox(
+            msg,
+            "Rounded Corner Geometry Error",
+            wx.OK | wx.ICON_ERROR
+        )
+        return
+
     # if r_corner == 0:
     #     create_left_center_right_angled(board, layer, center, w_length, w_height, clearance, track_width, track_spacing, n)
     #     return
@@ -265,6 +286,18 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     :param n: number of turns
     :type: int (internal units, nm)
     """
+
+    # Validation for radius to avoid intrusion of the track arc into the core corners
+    ok, msg = validate_rounded_corner_core_clearance(r_corner, clearance)
+
+    if not ok:
+        wx.MessageBox(
+            msg,
+            "Rounded Corner Geometry Error",
+            wx.OK | wx.ICON_ERROR
+        )
+        return
+
     # if n == 1:
     #     create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
     #     return
@@ -363,6 +396,18 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
     :param n: number of turns
     :type: int (internal units, nm)
     """
+
+    # Validation for radius to avoid intrusion of the track arc into the core corners
+    ok, msg = validate_rounded_corner_core_clearance(r_corner, clearance)
+
+    if not ok:
+        wx.MessageBox(
+            msg,
+            "Rounded Corner Geometry Error",
+            wx.OK | wx.ICON_ERROR
+        )
+        return
+
     # if n == 1:
     #     create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
     #     return
