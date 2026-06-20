@@ -4,7 +4,8 @@ from drawing import add_rect_vertical, add_rect_horizontal
 
 # ----------------------Rectangular Geometry routines ----------------------
 def create_left_top_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I", w_length: int,
-                                 w_height: int, clearance: int, track_width: int, track_spacing: int, n: int):
+                                 w_height: int, clearance: int, track_width: int, track_spacing: int, n: int,
+                                 mirror_x=False, mirror_y=False):
     """
     Draw a rectangular planar winding with true right-angled corners
     using filled rectangles. Starts from left-top and grows outward.
@@ -29,7 +30,10 @@ def create_left_top_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcb
     :type: int (internal units, nm)
     :param n: number of turns
     :type: int (internal units, nm)
-
+    :param mirror_x: Mirror about X-axis through center.
+    :type mirror_x: bool
+    :param mirror_y: Mirror about Y-axis through center.
+    :type mirror_y: bool
     """
 
     if n < 1:
@@ -68,19 +72,19 @@ def create_left_top_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcb
         # ---------------------------------
         y1 = now_y + first_turn_offset
         y2 = bottom
-        add_rect_vertical(board, now_x, y1, y2, t_width, layer)
+        add_rect_vertical(board, now_x, y1, y2, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
         now_y = bottom
 
         # ---------------------------------
         # Bottom horizontal
         # ---------------------------------
-        add_rect_horizontal(board, now_x, right, now_y, t_width, layer)
+        add_rect_horizontal(board, now_x, right, now_y, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
         now_x = right
 
         # ---------------------------------
         # Right vertical
         # ---------------------------------
-        add_rect_vertical(board, now_x, now_y, top, t_width, layer)
+        add_rect_vertical(board, now_x, now_y, top, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
         now_y = top
 
         # ---------------------------------
@@ -88,7 +92,7 @@ def create_left_top_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcb
         # ---------------------------------
         if n == 1:
             end_x = left
-            add_rect_horizontal(board, now_x, end_x, now_y, t_width, layer)
+            add_rect_horizontal(board, now_x, end_x, now_y, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
             break
 
         # ---------------------------------
@@ -97,7 +101,7 @@ def create_left_top_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcb
         next_left = left - outward_increment
         if turn == n - 1:
             next_left = left
-        add_rect_horizontal(board, now_x, next_left, now_y, t_width, layer)
+        add_rect_horizontal(board, now_x, next_left, now_y, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
         now_x = next_left
 
         # Expand rectangle outward
@@ -106,15 +110,9 @@ def create_left_top_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcb
         top    -= outward_increment
         bottom += outward_increment
 
-def create_left_bottom_right_angled(board: "pcbnew.BOARD",
-                                    layer: int,
-                                    center: "pcbnew.VECTOR2I",
-                                    w_length: int,
-                                    w_height: int,
-                                    clearance: int,
-                                    track_width: int,
-                                    track_spacing: int,
-                                    n: int):
+def create_left_bottom_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I", w_length: int,
+                                    w_height: int, clearance: int, track_width: int, track_spacing: int, n: int,
+                                    mirror_x=False, mirror_y=False):
     """
     Draw a rectangular planar winding with true right-angled corners
     using filled rectangles.
@@ -181,20 +179,20 @@ def create_left_bottom_right_angled(board: "pcbnew.BOARD",
         # ---------------------------------
         # Bottom horizontal
         # ---------------------------------
-        add_rect_horizontal(board, now_x + first_turn_offset, right, now_y, t_width, layer)
+        add_rect_horizontal(board, now_x + first_turn_offset, right, now_y, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
         now_x = right
 
         # ---------------------------------
         # Right vertical
         # ---------------------------------
-        add_rect_vertical(board, now_x, now_y, top, t_width, layer)
+        add_rect_vertical(board, now_x, now_y, top, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
         now_y = top
 
         # ---------------------------------
         # Top horizontal
         # ---------------------------------
         # next_left = left - outward_increment
-        add_rect_horizontal(board, now_x, left, now_y, t_width, layer)
+        add_rect_horizontal(board, now_x, left, now_y, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
         now_x = left
 
         # ---------------------------------
@@ -202,7 +200,7 @@ def create_left_bottom_right_angled(board: "pcbnew.BOARD",
         # ---------------------------------
         if n == 1:
             end_y = bottom
-            add_rect_vertical(board, now_x, now_y, end_y, t_width, layer)
+            add_rect_vertical(board, now_x, now_y, end_y, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
             break
 
         # ---------------------------------
@@ -211,7 +209,7 @@ def create_left_bottom_right_angled(board: "pcbnew.BOARD",
         next_bottom = bottom + outward_increment
         if turn == n - 1:
             next_bottom = bottom
-        add_rect_vertical(board, now_x, now_y, next_bottom, t_width, layer)
+        add_rect_vertical(board, now_x, now_y, next_bottom, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
         now_y = next_bottom
 
         # Expand outward for next turn
@@ -221,7 +219,8 @@ def create_left_bottom_right_angled(board: "pcbnew.BOARD",
         bottom += outward_increment
 
 def create_left_center_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I", w_length: int,
-                                    w_height: int, clearance: int, track_width: int, track_spacing: int, n: int):
+                                    w_height: int, clearance: int, track_width: int, track_spacing: int, n: int,
+                                    mirror_x=False, mirror_y=False):
     """
     Draw a rectangular planar winding with true right-angled corners
     using filled rectangles.
@@ -291,26 +290,26 @@ def create_left_center_right_angled(board: "pcbnew.BOARD", layer: int, center: "
         if n == 1: # and turn == 0:
             start_y = now_y + single_gap
 
-        add_rect_vertical(board, now_x, start_y, bottom, t_width, layer)
+        add_rect_vertical(board, now_x, start_y, bottom, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
         now_y = bottom
 
         # ---------------------------------
         # Bottom horizontal
         # ---------------------------------
-        add_rect_horizontal(board, now_x, right, now_y, t_width, layer)
+        add_rect_horizontal(board, now_x, right, now_y, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
         now_x = right
 
         # ---------------------------------
         # Right vertical
         # ---------------------------------
-        add_rect_vertical(board, now_x, now_y, top, t_width, layer)
+        add_rect_vertical(board, now_x, now_y, top, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
         now_y = top
 
         # ---------------------------------
         # Top horizontal
         # ---------------------------------
         next_left = left - (0 if n == 1 else outward_increment)
-        add_rect_horizontal(board, now_x, next_left, now_y, t_width, layer)
+        add_rect_horizontal(board, now_x, next_left, now_y, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
         now_x = next_left
 
         # ---------------------------------
@@ -318,11 +317,11 @@ def create_left_center_right_angled(board: "pcbnew.BOARD", layer: int, center: "
         # ---------------------------------
         if n == 1 or turn == n - 1:
             end_y = cy - single_gap - t_width // 2
-            add_rect_vertical(board, now_x, now_y, end_y, t_width, layer)
+            add_rect_vertical(board, now_x, now_y, end_y, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
             break
         else:
             next_bottom = bottom + outward_increment
-            add_rect_vertical(board, now_x, now_y, next_bottom, t_width, layer)
+            add_rect_vertical(board, now_x, now_y, next_bottom, t_width, layer, center=center, mirror_x=mirror_x, mirror_y=mirror_y)
             now_y = next_bottom
 
         # Expand outward for next turn

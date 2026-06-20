@@ -1,6 +1,6 @@
 import pcbnew
 import math
-from geometry import v2, d2r
+from geometry import v2, d2r, transform_point
 
 def add_track(board, p1, p2, layer, width):
     """Add a straight copper TRACK segment on the board.
@@ -90,7 +90,60 @@ def add_rect(board, x, y, w, h, layer):
     poly.SetPolyPoints(pts)
     board.Add(poly)
 
-def add_rect_vertical(board, x, y1, y2, width, layer):
+def add_rect_mirrored(board, x, y, w, h, layer, center=None, mirror_x=False, mirror_y=False):
+    """
+    Add a filled rectangular polygon with optional mirroring.
+
+    The input rectangle is defined by top-left corner `(x, y)` and
+    dimensions `w` and `h`. If mirroring is enabled, two opposite corners
+    are transformed about `center`, then the resulting rectangle is
+    normalized before being added to the board.
+
+    :param board: Current board instance.
+    :type board: pcbnew.BOARD
+    :param x: Rectangle left/top X coordinate in internal units.
+    :type x: int
+    :param y: Rectangle left/top Y coordinate in internal units.
+    :type y: int
+    :param w: Rectangle width in internal units.
+    :type w: int
+    :param h: Rectangle height in internal units.
+    :type h: int
+    :param layer: Target KiCad layer ID.
+    :type layer: int
+    :param center: Mirror reference point. Required if mirroring is enabled.
+    :type center: pcbnew.VECTOR2I | None
+    :param mirror_x: Mirror about X-axis through center.
+    :type mirror_x: bool
+    :param mirror_y: Mirror about Y-axis through center.
+    :type mirror_y: bool
+    :rtype: None
+    """
+
+    if not mirror_x and not mirror_y:
+        add_rect(board, x, y, w, h, layer)
+        return
+
+    if center is None:
+        raise ValueError("center must be provided when mirroring rectangles")
+
+    # Original opposite corners
+    x1, y1 = x, y
+    x2, y2 = x + w, y + h
+
+    # Transform opposite corners
+    tx1, ty1 = transform_point(x1, y1, center, mirror_x, mirror_y)
+    tx2, ty2 = transform_point(x2, y2, center, mirror_x, mirror_y)
+
+    # Normalize back to top-left + positive width/height
+    nx = min(tx1, tx2)
+    ny = min(ty1, ty2)
+    nw = abs(tx2 - tx1)
+    nh = abs(ty2 - ty1)
+
+    add_rect(board, nx, ny, nw, nh, layer)
+
+def add_rect_vertical(board, x, y1, y2, width, layer, center=None, mirror_x=False, mirror_y=False):
     """
     Add a filled vertical rectangular copper segment to the board.
 
@@ -119,15 +172,22 @@ def add_rect_vertical(board, x, y1, y2, width, layer):
     :type width: int
     :param layer: Target KiCad layer ID, for example `pcbnew.F_Cu`.
     :type layer: int
+    :param center: Mirror reference point. Required if mirroring is enabled.
+    :type center: pcbnew.VECTOR2I | None
+    :param mirror_x: Mirror about X-axis through center.
+    :type mirror_x: bool
+    :param mirror_y: Mirror about Y-axis through center.
+    :type mirror_y: bool
     :rtype: None
     """
     half_width = width // 2
     x0 = x - half_width
     y0 = min(y1, y2) - half_width
     h  = abs(y2 - y1) + width
-    add_rect(board, x0, y0, width, h, layer)
+    add_rect_mirrored(board, x0, y0, width, h, layer, center = center,
+                      mirror_x = mirror_x, mirror_y = mirror_y)
 
-def add_rect_horizontal(board, x1, x2, y, width, layer):
+def add_rect_horizontal(board, x1, x2, y, width, layer, center=None, mirror_x=False, mirror_y=False):
     """
     Add a filled horizontal rectangular copper segment to the board.
 
@@ -156,10 +216,17 @@ def add_rect_horizontal(board, x1, x2, y, width, layer):
     :type width: int
     :param layer: Target KiCad layer ID, for example `pcbnew.F_Cu`.
     :type layer: int
+    :param center: Mirror reference point. Required if mirroring is enabled.
+    :type center: pcbnew.VECTOR2I | None
+    :param mirror_x: Mirror about X-axis through center.
+    :type mirror_x: bool
+    :param mirror_y: Mirror about Y-axis through center.
+    :type mirror_y: bool
     :rtype: None
     """
     half_width = width // 2
     x0 = min(x1, x2) - half_width
     y0 = y - half_width
     w  = abs(x2 - x1) + width
-    add_rect(board, x0, y0, w, width, layer)
+    add_rect_mirrored(board, x0, y0, w, width, layer, center = center,
+                      mirror_x = mirror_x, mirror_y = mirror_y)

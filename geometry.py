@@ -61,3 +61,24 @@ def validate_rounded_corner_core_clearance(r_corner, clearance):
         return False, msg
 
     return True, ""
+
+def transform_point(x, y, center, mirror_x=False, mirror_y=False):
+    """Return a KiCad VECTOR2I point from (x, y), casting to ints (nm units).
+    :param x: X coordinate
+    :type x: float
+    :param y: Y coordinate
+    :type y: float
+    :param center: Mirror reference point.
+    :type center: pcbnew.VECTOR2I
+    :param mirror_x: If True, mirror about the X-axis through center.
+    :type mirror_x: bool
+    :param mirror_y: If True, mirror about the Y-axis through center.
+    :type mirror_y: bool
+    :return: Transformed coordinate tuple.
+    :rtype: tuple[int, int]
+    """
+    if mirror_y:
+        x = 2 * center.x - x
+    if mirror_x:
+        y = 2 * center.y - y
+    return pcbnew.VECTOR2I(int(x), int(y))

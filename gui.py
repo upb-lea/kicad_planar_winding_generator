@@ -101,6 +101,14 @@ class ParamsDialog(wx.Dialog):
         start_box.Add(self.rb_top); start_box.Add(self.rb_center); start_box.Add(self.rb_bottom)
         s.Add(start_box, 0, wx.EXPAND | wx.BOTTOM, 6)
 
+        # Mirror options check box
+        mirror_box = wx.StaticBoxSizer(wx.StaticBox(p, label="Mirror"), wx.HORIZONTAL)
+        self.mirror_x_cb = wx.CheckBox(p, label="Mirror X")
+        self.mirror_y_cb = wx.CheckBox(p, label="Mirror Y")
+        mirror_box.Add(self.mirror_x_cb, 0, wx.RIGHT, 10)
+        mirror_box.Add(self.mirror_y_cb, 0)
+        s.Add(mirror_box, 0, wx.EXPAND | wx.TOP, 6)
+
         # ---------------------- Parameter diagram (no scaling) ----------------------
         diag_box = wx.StaticBoxSizer(wx.VERTICAL, p, "Parameter diagram")
         self._diag_bmp = wx.StaticBitmap(p, bitmap=wx.NullBitmap)
@@ -180,5 +188,7 @@ class ParamsDialog(wx.Dialog):
             corner_type = corner_type,
             start=start,
             layer_name=self.layer_choice.GetStringSelection(),
+            mirror_x=self.mirror_x_cb.GetValue(),
+            mirror_y=self.mirror_y_cb.GetValue(),
             center_nm=self.center_nm,  # remains None → Run() uses entered mm
         )

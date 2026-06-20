@@ -71,6 +71,8 @@ class PlanarRectSpiralLC(pcbnew.ActionPlugin):
         start = int(P["start"])  # 0=LT, 1=LC, 2=LB
         layer = layer_id(board, P["layer_name"])
         corner_type = P["corner_type"]
+        mirror_x = P.get("mirror_x", False)
+        mirror_y = P.get("mirror_y", False)
 
         # Optional debug tick at center
         if debug_test:
@@ -100,22 +102,16 @@ class PlanarRectSpiralLC(pcbnew.ActionPlugin):
             else:
 
                 if start == 0:
-                    create_left_top_right_angled(
-                        board, layer, center,
-                        sx, sy, cin, w, sp, n
-                    )
+                    create_left_top_right_angled(board, layer, center, sx, sy, cin, w, sp, n,
+                                                  mirror_x=mirror_x, mirror_y=mirror_y)
 
                 elif start == 1:
-                    create_left_center_right_angled(
-                        board, layer, center,
-                        sx, sy, cin, w, sp, n
-                    )
+                    create_left_center_right_angled(board, layer, center, sx, sy, cin, w, sp, n,
+                                                     mirror_x=mirror_x, mirror_y=mirror_y)
 
                 elif start == 2:
-                    create_left_bottom_right_angled(
-                        board, layer, center,
-                        sx, sy, cin, w, sp, n
-                    )
+                    create_left_bottom_right_angled(board, layer, center, sx, sy, cin, w, sp, n,
+                                                    mirror_x=mirror_x, mirror_y=mirror_y)
             # if start == 0:
             #     create_left_top(board, layer, center, sx, sy, r, cin, w, sp, n)
             # elif start == 2:
