@@ -21,6 +21,89 @@ def add_track(board, p1, p2, layer, width):
     t.SetLayer(layer); t.SetWidth(max(width, 1))  # ensure nonzero width
     board.Add(t)
 
+def arc_points_from_center(center, radius, angle_start_deg, angle_end_deg):
+    """
+    Compute start, mid, and end points for a circular arc.
+
+    Uses KiCad-style board coordinates:
+    0 deg = +X/right
+    90 deg = +Y/down
+    180 deg = left
+    270 deg = up
+
+    The midpoint is chosen on the shortest sweep between start and end.
+    """
+
+    # Compute shortest signed angular sweep
+    delta = (angle_end_deg - angle_start_deg) % 360
+
+    if delta > 180:
+        delta -= 360
+
+    angle_mid_deg = angle_start_deg + delta / 2.0
+
+    def point_at(angle_deg):
+        """
+        Determine the x,y position for a given center, radius and angle
+        """
+        angle_rad = math.radians(angle_deg)
+        return v2(
+            int(round(center.x + radius * math.cos(angle_rad))),
+            int(round(center.y + radius * math.sin(angle_rad)))
+        )
+
+    start = point_at(angle_start_deg)
+    mid   = point_at(angle_mid_deg)
+    end   = point_at(angle_end_deg)
+
+    return start, mid, end
+
+def add_arc_points(board, start, mid, end, layer, width):
+    """
+    Add a PCB arc using explicit start, mid, and end points.
+
+    :param board: Current board instance.
+    :type board: pcbnew.BOARD
+    :param start: Arc start point.
+    :type start: tuple[int, int]
+    :param mid: Arc midpoint defining curvature.
+    :type mid: tuple[int, int]
+    :param end: Arc end point.
+    :type end: tuple[int, int]
+    :param layer: Target KiCad layer.
+    :type layer: int
+    :param width: Arc track width in internal units.
+    :type width: int
+    """
+    arc = pcbnew.PCB_ARC(board)
+    arc.SetLayer(layer)
+    arc.SetWidth(max(width, 1))
+    arc.SetStart(start)
+    arc.SetMid(mid)
+    arc.SetEnd(end)
+    board.Add(arc)
+
+def add_arc_transformed_points(board, center, radius,
+                               angle_start_deg, angle_end_deg,
+                               layer, width,
+                               mirror_center,
+                               mirror_x=False,
+                               mirror_y=False):
+    """
+    Add an arc after transforming its start/mid/end points.
+
+    This avoids transforming arc angles directly.
+    """
+
+    start, mid, end = arc_points_from_center(
+        center, radius, angle_start_deg, angle_end_deg)
+
+    start_transformed = transform_point(start.x, start.y, mirror_center, mirror_x, mirror_y)
+    mid_transformed   = transform_point(mid.x,   mid.y,   mirror_center, mirror_x, mirror_y)
+    end_transformed   = transform_point(end.x,   end.y,   mirror_center, mirror_x, mirror_y)
+
+    add_arc_points(board, start_transformed, mid_transformed, end_transformed, layer, width)
+
 def add_arc(board, center, radius, ang_start_deg, ang_end_deg, layer, width):
     """Create a circular arc by start/mid/end points. Angles in degrees (0=+x, CCW positive).
     :param board: Current board instance

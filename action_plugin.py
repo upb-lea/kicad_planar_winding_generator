@@ -85,19 +85,16 @@ class PlanarRectSpiralLC(pcbnew.ActionPlugin):
             if corner_type == "Rounded Corner":
 
                 if start == 0:
-                    create_left_top(
-                        board, layer, center,
-                        sx, sy, r, cin, w, sp, n)
+                    create_left_top(board, layer, center, sx, sy, r, cin, w, sp, n,
+                                     mirror_x=mirror_x, mirror_y=mirror_y)
 
                 elif start == 1:
-                    create_left_center(
-                        board, layer, center,
-                        sx, sy, r, cin, w, sp, n)
+                    create_left_center(board, layer, center, sx, sy, r, cin, w, sp, n,
+                                       mirror_x=mirror_x, mirror_y=mirror_y)
 
                 elif start == 2:
-                    create_left_bottom(
-                        board, layer, center,
-                        sx, sy, r, cin, w, sp, n)
+                    create_left_bottom(board, layer, center, sx, sy, r, cin, w, sp, n,
+                                       mirror_x=mirror_x, mirror_y=mirror_y)
 
             else:
 

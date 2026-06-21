@@ -81,4 +81,4 @@ def transform_point(x, y, center, mirror_x=False, mirror_y=False):
         x = 2 * center.x - x
     if mirror_x:
         y = 2 * center.y - y
-    return pcbnew.VECTOR2I(int(x), int(y))
+    return v2(x, y)

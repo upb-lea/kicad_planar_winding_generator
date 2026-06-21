@@ -1,12 +1,14 @@
 import wx
 import math
-from drawing import add_track, add_arc
-from geometry import v2, validate_rounded_corner_core_clearance
+from drawing import add_track, add_arc, add_arc_transformed_points
+from geometry import v2, validate_rounded_corner_core_clearance, transform_point
+
 
 # ----------------------Rounded Geometry routines ----------------------
 def create_left_center_single(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                                w_length: int, w_height: int, r_corner: int, clearance: int,
-                               track_width: int, track_spacing: int):
+                               track_width: int, track_spacing: int, mirror_x = False,
+                              mirror_y = False):
     """Draw a single-turn rectangle winding starting from the left-center.
     Handles the left-side start/return segment separation correctly for any
     trace width: the two stub ends are separated centre-to-centre by exactly
@@ -82,44 +84,54 @@ def create_left_center_single(board: "pcbnew.BOARD", layer: int, center: "pcbnew
 
     #  Start stub: downward segment to bottom-left arc tangent
     if angle == 90:
-        p1 = v2(now_x, now_y)
-        p2 = v2(now_x, now_y + (f_height // 2) - half_sep)  # reach arc tangent
-        add_track(board, p1, p2, layer, t_width)
-        now_y = p2.y
+        start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_point = transform_point(now_x, now_y + (f_height // 2) - half_sep, center, mirror_x, mirror_y)  # reach arc tangent
+        add_track(board, start_point, end_point, layer, t_width)
+        now_y = now_y + (f_height // 2) - half_sep
 
     #  Arc bottom-left
-    c1 = v2(now_x + radius_now, now_y)
-    add_arc(board, c1, radius_now, 90, 90 + angle, layer, t_width)
+    arc_center = v2(now_x + radius_now, now_y)
+    add_arc_transformed_points(board, arc_center, radius_now, 90, 90 + angle, layer, t_width,
+                               center, mirror_x, mirror_y)
     now_x = now_x + radius_now
     now_y = now_y + radius_now
 
     #  Bottom straight
-    add_track(board, v2(now_x, now_y), v2(now_x + f_length, now_y), layer, t_width)
+    start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+    end_point = transform_point(now_x + f_length, now_y, center, mirror_x, mirror_y)
+    add_track(board, start_point, end_point, layer, t_width)
     now_x = now_x + f_length
 
     #  Arc bottom-right
-    c2 = v2(now_x, now_y - radius_now)
-    add_arc(board, c2, radius_now, 0, 90, layer, t_width)
+    arc_center = v2(now_x, now_y - radius_now)
+    add_arc_transformed_points(board, arc_center, radius_now, 0, 90, layer, t_width,
+                               center, mirror_x, mirror_y)
     now_x = now_x + radius_now
     now_y = now_y - radius_now
 
     #  Right vertical straight
-    add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
+    start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+    end_point = transform_point(now_x, now_y - f_height, center, mirror_x, mirror_y)
+    add_track(board, start_point, end_point, layer, t_width)
     now_y = now_y - f_height
 
     #  Arc top-right
-    c3 = v2(now_x - radius_now, now_y)
-    add_arc(board, c3, radius_now, 270, 360, layer, t_width)
+    arc_center = v2(now_x - radius_now, now_y)
+    add_arc_transformed_points(board, arc_center, radius_now, 270, 360, layer, t_width,
+                               center, mirror_x, mirror_y)
     now_x = now_x - radius_now
     now_y = now_y - radius_now
 
     #  Top straight (rad_inc = 0 for single turn, no length extension)
-    add_track(board, v2(now_x, now_y), v2(now_x - f_length, now_y), layer, t_width)
+    start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+    end_point = transform_point(now_x - f_length, now_y, center, mirror_x, mirror_y)
+    add_track(board, start_point, end_point, layer, t_width)
     now_x = now_x - f_length
 
     #  Arc top-left (radius unchanged — single turn, no increment)
-    c4 = v2(now_x, now_y + radius_now)
-    add_arc(board, c4, radius_now, 270 - angle, 270, layer, t_width)
+    arc_center = v2(now_x, now_y + radius_now)
+    add_arc_transformed_points(board, arc_center, radius_now, 270 - angle, 270, layer, t_width,
+                               center, mirror_x, mirror_y)
     now_x = now_x - radius_now
     now_y = now_y + radius_now
 
@@ -127,13 +139,14 @@ def create_left_center_single(board: "pcbnew.BOARD", layer: int, center: "pcbnew
     # Centre-to-centre distance between stubs = 2 * half_sep = t_width + t_spacing
     # Cap edges are therefore exactly track_spacing apart.
     if angle == 90:
-        p3 = v2(now_x, now_y)
-        p4 = v2(now_x, ay - half_sep)  # return stub centre-y
-        add_track(board, p3, p4, layer, t_width)
+        start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_point = transform_point(now_x, ay - half_sep, center, mirror_x, mirror_y)  # return stub centre-y
+        add_track(board, start_point, end_point, layer, t_width)
 
 def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                        w_length: int, w_height: int, r_corner: int, clearance: int,
-                       track_width: int, track_spacing: int, n: int):
+                       track_width: int, track_spacing: int, n: int, mirror_x = False,
+                       mirror_y = False):
     """Draw a rectangle spiral starting from the left-center. All internal geometry is integer nanometers.
     For n == 1 delegates to create_left_center_single() which handles the
     left-side stub separation correctly for any trace width.
@@ -176,8 +189,8 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     #     return
 
     if n == 1:
-        create_left_center_single(board, layer, center, w_length, w_height,
-                                  r_corner, clearance, track_width, track_spacing)
+        create_left_center_single(board, layer, center, w_length, w_height, r_corner, clearance,
+                                  track_width, track_spacing, mirror_x=mirror_x, mirror_y=mirror_y)
         return
 
     #  Multi-turn path (n > 1)
@@ -199,61 +212,72 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     angle = 90
     rad_inc1 = (t_spacing // 2) + (t_width // 2)
     rad_inc2 = rad_inc1
-
-    if radius_now > ((w_height // 2) + Clearance + (t_width // 2)):
+    #TODO: adopt condition similar to create_left_center_single
+    #if radius_now > ((w_height // 2) + Clearance + (t_width // 2)):
+    if t_width // 2 > w_height // 2 - radius:
         ratio = 1.0 - float(((w_height // 2) + Clearance - (t_spacing // 2))) / float(radius_now)
         ratio = max(-1.0, min(1.0, ratio))
         angle = int(round(180.0 * math.acos(ratio) / math.pi))
 
     for _ in range(windings):
         if angle == 90:
-            p1 = v2(now_x, now_y)
-            p2 = v2(now_x, now_y + (f_height // 2))
-            add_track(board, p1, p2, layer, t_width)
+            start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+            end_point = transform_point(now_x, now_y + (f_height // 2), center, mirror_x, mirror_y)
+            add_track(board, start_point, end_point, layer, t_width)
             now_y = now_y + (f_height // 2)
 
         # Arc bottom-left
-        c1 = v2(now_x + radius_now, now_y)
-        add_arc(board, c1, radius_now, 90, 90 + angle, layer, t_width)
+        arc_center = v2(now_x + radius_now, now_y)
+        add_arc_transformed_points(board, arc_center, radius_now, 90, 90 + angle, layer, t_width,
+                                   center, mirror_x, mirror_y)
         now_x = now_x + radius_now
         now_y = now_y + radius_now
 
         # Bottom straight
-        add_track(board, v2(now_x, now_y), v2(now_x + f_length, now_y), layer, t_width)
+        start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_point = transform_point(now_x + f_length, now_y, center, mirror_x, mirror_y)
+        add_track(board, start_point, end_point, layer, t_width)
         now_x = now_x + f_length
 
         # Arc bottom-right
-        c2 = v2(now_x, now_y - radius_now)
-        add_arc(board, c2, radius_now, 0, 90, layer, t_width)
+        arc_center = v2(now_x, now_y - radius_now)
+        add_arc_transformed_points(board, arc_center, radius_now, 0, 90, layer, t_width,
+                                   center, mirror_x, mirror_y)
         now_x = now_x + radius_now
         now_y = now_y - radius_now
 
         # Right vertical straight
-        add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
+        start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_point = transform_point(now_x, now_y - f_height, center, mirror_x, mirror_y)
+        add_track(board, start_point, end_point, layer, t_width)
         now_y = now_y - f_height
 
         # Arc top-right
-        c3 = v2(now_x - radius_now, now_y)
-        add_arc(board, c3, radius_now, 270, 360, layer, t_width)
+        arc_center = v2(now_x - radius_now, now_y)
+        add_arc_transformed_points(board, arc_center, radius_now, 270, 360, layer, t_width,
+                                   center, mirror_x, mirror_y)
         now_x = now_x - radius_now
         now_y = now_y - radius_now
 
         # Top straight
-        add_track(board, v2(now_x, now_y), v2(now_x - f_length - rad_inc2, now_y), layer, t_width)
+        start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_point = transform_point(now_x - f_length - rad_inc2, now_y, center, mirror_x, mirror_y)
+        add_track(board, start_point, end_point, layer, t_width)
         now_x = now_x - f_length - rad_inc2
 
         radius_now = radius_now + rad_inc1
 
         # Arc top-left
-        c4 = v2(now_x, now_y + radius_now)
-        add_arc(board, c4, radius_now, 270 - angle, 270, layer, t_width)
+        arc_center = v2(now_x, now_y + radius_now)
+        add_arc_transformed_points(board, arc_center, radius_now, 270 - angle, 270, layer, t_width,
+                                   center, mirror_x, mirror_y)
         now_x = now_x - radius_now
         now_y = now_y + radius_now
 
         if angle == 90:
-            p3 = v2(now_x, now_y)
-            p4 = v2(now_x, ay)
-            add_track(board, p3, p4, layer, t_width)
+            start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+            end_point = transform_point(now_x, ay, center, mirror_x, mirror_y)
+            add_track(board, start_point, end_point, layer, t_width)
             now_y = ay
 
         radius_now = radius_now + rad_inc2
@@ -261,7 +285,8 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
 
 def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                        w_length: int, w_height: int, r_corner: int, clearance: int,
-                       track_width: int, track_spacing: int, n: int):
+                       track_width: int, track_spacing: int, n: int, mirror_x = False,
+                       mirror_y = False):
     """Draw a rectangle spiral starting from the left-top. All internal geometry is integer nanometers.
 
     :param board: Current board instance
@@ -327,42 +352,60 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
             first_turn_offset = t_width // 2
 
         # Bottom straight
-        add_track(board, v2(now_x + first_turn_offset, now_y), v2(now_x + f_length, now_y), layer, t_width)
+        start_point = transform_point(now_x + first_turn_offset, now_y, center, mirror_x, mirror_y)
+        end_point = transform_point(now_x + f_length, now_y, center, mirror_x, mirror_y)
+        add_track(board, start_point,end_point ,layer, t_width)
         now_x = now_x + f_length
 
         # Arc bottom-right
-        add_arc(board, v2(now_x, now_y - radius_now), radius_now, 0, 90, layer, t_width)
+        arc_center = v2(now_x, now_y - radius_now)
+        add_arc_transformed_points(board, arc_center, radius_now, 0, 90, layer, t_width,
+                                   center, mirror_x, mirror_y)
         now_x = now_x + radius_now
         now_y = now_y - radius_now
 
         # Right vertical straight
-        add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
+        start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_point = transform_point(now_x, now_y - f_height, center, mirror_x, mirror_y)
+        add_track(board, start_point,end_point ,layer, t_width)
         now_y = now_y - f_height
 
         # Arc top-right
-        add_arc(board, v2(now_x - radius_now, now_y), radius_now, 270, 360, layer, t_width)
+        arc_center = v2(now_x - radius_now, now_y)
+        add_arc_transformed_points(board, arc_center, radius_now, 270, 360, layer, t_width,
+                                   center, mirror_x, mirror_y)
         now_x = now_x - radius_now
         now_y = now_y - radius_now
 
         # Top straight
-        add_track(board, v2(now_x, now_y), v2(now_x - f_length, now_y), layer, t_width)
+        start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_point = transform_point(now_x - f_length, now_y, center, mirror_x, mirror_y)
+        add_track(board, start_point, end_point, layer, t_width)
         now_x = now_x - f_length
 
         # Arc top-left
-        add_arc(board, v2(now_x, now_y + radius_now), radius_now, 180, 270, layer, t_width)
+        arc_center = v2(now_x, now_y + radius_now)
+        add_arc_transformed_points(board, arc_center, radius_now, 180, 270, layer, t_width,
+                                   center, mirror_x, mirror_y)
         now_x = now_x - radius_now
         now_y = now_y + radius_now
 
         # Left straight
         # Break here for single turn
         if n == 1:
-            add_track(board, v2(now_x, now_y), v2(now_x, now_y + f_height + t_width // 2 + t_spacing // 2), layer, t_width)
+            start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+            end_point = transform_point(now_x, now_y + f_height + t_width // 2 + t_spacing // 2, center, mirror_x, mirror_y)
+            add_track(board, start_point, end_point, layer, t_width)
             break
 
-        add_track(board, v2(now_x, now_y), v2(now_x, now_y + f_height + t_width + t_spacing), layer, t_width)
+        start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_point = transform_point(now_x, now_y + f_height + t_width + t_spacing, center, mirror_x, mirror_y)
+        add_track(board, start_point, end_point, layer, t_width)
         now_y = now_y + f_height + t_width + t_spacing
 
-        add_arc(board, v2(now_x + radius_now, now_y), radius_now, 90, 180, layer, t_width)
+        arc_center = v2(now_x + radius_now, now_y)
+        add_arc_transformed_points(board, arc_center, radius_now, 90, 180, layer, t_width,
+                                   center, mirror_x, mirror_y)
         now_x = now_x + radius_now
         now_y = now_y + radius_now
 
@@ -371,7 +414,7 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
 
 def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                     w_length: int, w_height: int, r_corner: int, clearance: int,
-                    track_width: int, track_spacing: int, n: int):
+                    track_width: int, track_spacing: int, n: int, mirror_x = False, mirror_y = False):
     """Draw a rectangle spiral starting from the left-bottom. All internal geometry is integer nanometers.
 
     :param board: Current board instance
@@ -436,44 +479,62 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
             first_turn_offset = t_width // 2
 
         # Left straight
-        add_track(board, v2(now_x, now_y + first_turn_offset), v2(now_x, now_y + f_height), layer, t_width)
+        start_point = transform_point(now_x, now_y + first_turn_offset, center, mirror_x, mirror_y)
+        end_point = transform_point(now_x, now_y + f_height, center, mirror_x, mirror_y)
+        add_track(board, start_point, end_point, layer, t_width)
         now_y = now_y + f_height
 
         # Arc bottom-left
-        add_arc(board, v2(now_x + radius_now, now_y), radius_now, 90, 180, layer, t_width)
+        arc_center = v2(now_x + radius_now, now_y)
+        add_arc_transformed_points(board, arc_center, radius_now, 90, 180, layer, t_width,
+                                   center, mirror_x, mirror_y)
         now_x = now_x + radius_now
         now_y = now_y + radius_now
 
         # Bottom straight
-        add_track(board, v2(now_x, now_y), v2(now_x + f_length, now_y), layer, t_width)
+        start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_point = transform_point(now_x + f_length, now_y, center, mirror_x, mirror_y)
+        add_track(board, start_point, end_point, layer, t_width)
         now_x = now_x + f_length
 
         # Arc bottom-right
-        add_arc(board, v2(now_x, now_y - radius_now), radius_now, 0, 90, layer, t_width)
+        arc_center = v2(now_x, now_y - radius_now)
+        add_arc_transformed_points(board, arc_center, radius_now, 0, 90, layer, t_width,
+                                   center, mirror_x, mirror_y)
         now_x = now_x + radius_now
         now_y = now_y - radius_now
 
         # Right vertical straight
-        add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
+        start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_point = transform_point(now_x, now_y - f_height, center, mirror_x, mirror_y)
+        add_track(board, start_point, end_point, layer, t_width)
         now_y = now_y - f_height
 
         # Arc top-right
-        add_arc(board, v2(now_x - radius_now, now_y), radius_now, 270, 360, layer, t_width)
+        arc_center = v2(now_x - radius_now, now_y)
+        add_arc_transformed_points(board, arc_center, radius_now, 270, 360, layer, t_width,
+                                   center, mirror_x, mirror_y)
         now_x = now_x - radius_now
         now_y = now_y - radius_now
 
         # Top straight
         # Break here for single turn
         if n == 1:
-            add_track(board, v2(now_x, now_y), v2(now_x - f_length - t_width // 2 - track_spacing // 2, now_y), layer, t_width)
+            start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+            end_point = transform_point(now_x - f_length - t_width // 2 - track_spacing // 2, now_y, center, mirror_x, mirror_y)
+            add_track(board, start_point, end_point, layer, t_width)
             break
 
         # Top straight
-        add_track(board, v2(now_x, now_y), v2(now_x - f_length - t_width - track_spacing, now_y), layer, t_width)
+        start_point = transform_point(now_x, now_y, center, mirror_x, mirror_y)
+        end_point = transform_point(now_x - f_length - t_width - track_spacing, now_y, center, mirror_x, mirror_y)
+        add_track(board, start_point, end_point, layer, t_width)
         now_x = now_x - f_length - t_width - track_spacing
 
         # Arc top-left
-        add_arc(board, v2(now_x, now_y + radius_now), radius_now, 180, 270, layer, t_width)
+        arc_center = v2(now_x, now_y + radius_now)
+        add_arc_transformed_points(board, arc_center, radius_now, 180, 270, layer, t_width,
+                center, mirror_x, mirror_y)
         now_x = now_x - radius_now
         now_y = now_y + radius_now
 
