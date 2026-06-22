@@ -85,6 +85,118 @@ def add_arc(board, center, radius, ang_start_deg, ang_end_deg, layer, width):
     arc.SetStart(start); arc.SetMid(mid); arc.SetEnd(end)
     board.Add(arc)
 
+def add_rect(board, x, y, w, h, layer):
+    """Add a filled polygon rect. All arguments in internal units (nm).
+
+    The rectangle is created as a filled `pcbnew.PCB_SHAPE` polygon using
+    four corner points. The point `(x, y)` defines the top-left corner of
+    the rectangle in KiCad board coordinates. The rectangle extends in the
+    positive X direction by `w` and in the positive Y direction by `h`.
+
+    All coordinate and dimension arguments are expected to be in KiCad
+    internal units, nanometers.
+
+    :param board: Current board instance.
+    :type board: pcbnew.BOARD
+    :param x: X-coordinate of the rectangle's top-left corner, in internal KiCad units.
+    :type x: int
+    :param y: Y-coordinate of the rectangle's top-left corner, in internal KiCad units.
+    :type y: int
+    :param w: Width of the rectangle in the X direction, in internal KiCad units.
+    :type w: int
+    :param h: Height of the rectangle in the Y direction, in internal KiCad units.
+    :type h: int
+    :param layer: Target KiCad layer ID, for example `pcbnew.F_Cu`.
+    :type layer: int
+    :rtype: None
+    """
+    poly = pcbnew.PCB_SHAPE(board)
+    poly.SetShape(pcbnew.SHAPE_T_POLY)
+    poly.SetFilled(True)
+    poly.SetLayer(layer)
+    poly.SetWidth(0)
+    pts = [v2(x, y),
+           v2(x + w, y),
+           v2(x + w, y + h),
+           v2(x, y + h),
+    ]
+    poly.SetPolyPoints(pts)
+    board.Add(poly)
+
+def add_rect_vertical(board, x, y1, y2, width, layer):
+    """
+    Add a filled vertical rectangular copper segment to the board.
+
+    This helper creates a vertical copper rectangle from a centerline-style
+    definition. The segment centerline is located at X-coordinate `x` and
+    extends vertically from `y1` to `y2`. The copper rectangle is expanded
+    by `width / 2` on both sides of the centerline.
+
+    The rectangle is also extended by `width / 2` beyond both vertical
+    endpoints. This intentional extension allows adjacent horizontal
+    rectangular segments to overlap at corners, producing fully filled
+    right-angled corners without gaps or chamfered-looking edges.
+
+    All coordinate and dimension arguments are expected to be in KiCad
+    internal units, nanometers.
+
+    :param board: Current board instance.
+    :type board: pcbnew.BOARD
+    :param x: X-coordinate of the vertical segment centerline, in internal KiCad units.
+    :type x: int
+    :param y1: Y-coordinate of one endpoint of the vertical centerline, in internal KiCad units.
+    :type y1: int
+    :param y2: Y-coordinate of the other endpoint of the vertical centerline, in internal KiCad units.
+    :type y2: int
+    :param width: Width of the copper segment, in internal KiCad units.
+    :type width: int
+    :param layer: Target KiCad layer ID, for example `pcbnew.F_Cu`.
+    :type layer: int
+    :rtype: None
+    """
+    half_width = width // 2
+    x0 = x - half_width
+    y0 = min(y1, y2) - half_width
+    h  = abs(y2 - y1) + width
+    add_rect(board, x0, y0, width, h, layer)
+
+def add_rect_horizontal(board, x1, x2, y, width, layer):
+    """
+    Add a filled horizontal rectangular copper segment to the board.
+
+    This helper creates a horizontal copper rectangle from a centerline-style
+    definition. The segment centerline is located at Y-coordinate `y` and
+    extends horizontally from `x1` to `x2`. The copper rectangle is expanded
+    by `width / 2` on both sides of the centerline.
+
+    The rectangle is also extended by `width / 2` beyond both horizontal
+    endpoints. This intentional extension allows adjacent vertical
+    rectangular segments to overlap at corners, producing fully filled
+    right-angled corners without gaps or chamfered-looking edges.
+
+    All coordinate and dimension arguments are expected to be in KiCad
+    internal units, nanometers.
+
+    :param board: Current board instance.
+    :type board: pcbnew.BOARD
+    :param x1: X-coordinate of one endpoint of the horizontal centerline, in internal KiCad units.
+    :type x1: int
+    :param x2: X-coordinate of the other endpoint of the horizontal centerline, in internal KiCad units.
+    :type x2: int
+    :param y: Y-coordinate of the horizontal segment centerline, in internal KiCad units.
+    :type y: int
+    :param width: Width of the copper segment, in internal KiCad units.
+    :type width: int
+    :param layer: Target KiCad layer ID, for example `pcbnew.F_Cu`.
+    :type layer: int
+    :rtype: None
+    """
+    half_width = width // 2
+    x0 = min(x1, x2) - half_width
+    y0 = y - half_width
+    w  = abs(x2 - x1) + width
+    add_rect(board, x0, y0, w, width, layer)
+
 def layer_id(board, name):
     """Resolve a human-readable layer name to a KiCad layer ID.
 
@@ -98,6 +210,44 @@ def layer_id(board, name):
 
     lid = board.GetLayerID(name)
     return lid if lid != -1 else pcbnew.F_Cu
+
+def validate_rounded_corner_core_clearance(r_corner, clearance):
+    """
+    Validate that the rounded inner winding corner does not intrude into
+    the rectangular core corner.
+
+    All arguments are in KiCad internal units.
+
+    :param r_corner: User-defined geometric corner radius.
+    :type r_corner: int
+    :param clearance: Required clearance from core to winding.
+    :type clearance: int
+    :return: Tuple ``(ok, message)``. If valid, ``ok`` is True and message is empty.
+             If invalid, ``ok`` is False and message contains the error description.
+    :rtype: tuple[bool, str]
+    """
+
+    if r_corner <= 0:
+        return True, ""
+
+    diagonal = math.sqrt(2.0) * float(r_corner)
+    allowed = float(r_corner + clearance)
+
+    if diagonal > allowed:
+        max_radius = clearance / (math.sqrt(2.0) - 1.0)
+
+        msg = (
+            "Rounded corner radius is too large for the selected core clearance.\n\n"
+            "The inner copper arc would intrude into the core corner region.\n\n"
+            f"Selected radius: {pcbnew.ToMM(r_corner):.3f} mm\n"
+            f"Clearance: {pcbnew.ToMM(clearance):.3f} mm\n"
+            f"Maximum allowed radius: {pcbnew.ToMM(int(max_radius)):.3f} mm\n\n"
+            "Reduce the corner radius or increase the core clearance."
+        )
+
+        return False, msg
+
+    return True, ""
 
 
 # ---------------------- Parameters dialog ----------------------
@@ -135,7 +285,7 @@ class ParamsDialog(wx.Dialog):
 
         # Parameter names (all mm)
         self.gap    = row("Turn-Core (mm):", "0.30")       # inner clearance
-        self.radius = row("Radius (mm):", "2.00")    # corner radius
+        #self.radius = row("Radius (mm):", "0.50")    # corner radius
         self.twidth = row("Width (mm):", "0.25")     # track width
         self.guard  = row("Turn-Turn (mm):", "0.25")     # track-to-track spacing
 
@@ -149,6 +299,36 @@ class ParamsDialog(wx.Dialog):
         grid.Add(wx.StaticText(p, label="Height <h> (mm)"), 0, wx.ALIGN_CENTER_VERTICAL)
         self.size_y = wx.TextCtrl(p, value="16.0", style=wx.TE_RIGHT); grid.Add(self.size_y, 1, wx.EXPAND)
         props.Add(grid, 0, wx.EXPAND | wx.ALL, 4)
+
+        # -------------------------------------------------
+        # Winding corner type selector
+        # -------------------------------------------------
+        hl_corner = wx.BoxSizer(wx.HORIZONTAL)
+
+        hl_corner.Add(wx.StaticText(p, label="Winding Corner Type"), 0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
+
+        self.corner_choice = wx.Choice(p, choices=["Rounded Corner", "Right Angled"])
+        self.corner_choice.SetSelection(0)
+        self.corner_choice.Bind(wx.EVT_CHOICE, self.on_corner_type_changed)
+        wx.CallAfter(self.update_corner_ui)
+
+        hl_corner.Add(self.corner_choice, 1, wx.EXPAND | wx.RIGHT, 12)
+        props.Add(hl_corner, 0, wx.EXPAND | wx.TOP, 4)
+
+        # -------------------------------------------------
+        # Radius input
+        # -------------------------------------------------
+        self.radius_row = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.radius_label = wx.StaticText(p, label="Radius (mm):")
+        self.radius_row.Add(self.radius_label, 0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
+
+        self.radius_size = wx.TextCtrl(p, value="0.5")
+        self.radius_row.Add(self.radius_size, 1, wx.EXPAND | wx.RIGHT, 12)
+
+        props.Add(self.radius_row, 0, wx.EXPAND | wx.TOP, 4)
 
         # Layer selector
         hl = wx.BoxSizer(wx.HORIZONTAL)
@@ -200,6 +380,20 @@ class ParamsDialog(wx.Dialog):
         # Internal state: captured center (removed mouse capture → always None)
         self.center_nm = None
 
+    def on_corner_type_changed(self, event):
+        self.update_corner_ui()
+
+    def update_corner_ui(self):
+        is_rounded = self.corner_choice.GetSelection() == 0
+
+        self.radius_label.Enable(is_rounded)
+        self.radius_size.Enable(is_rounded)
+
+        if not is_rounded:
+            self.radius_size.SetValue("0.0")
+
+        self.Layout()
+
     def _on_dialog_resize(self, evt):
         evt.Skip()
 
@@ -212,16 +406,25 @@ class ParamsDialog(wx.Dialog):
         start = 1  # default Left-Center
         if self.rb_top.GetValue(): start = 0
         if self.rb_bottom.GetValue(): start = 2
+
+        corner_type = self.corner_choice.GetStringSelection()
+
+        if corner_type == "Rounded Corner":
+            r = float(self.radius_size.GetValue())
+        else:
+            r = 0.0
+
         return dict(
             cx_mm=f(self.cx.GetValue()),
             cy_mm=f(self.cy.GetValue()),
             sx=f(self.size_x.GetValue()),
             sy=f(self.size_y.GetValue()),
-            r=f(self.radius.GetValue()),
+            r=r,
             cin=f(self.gap.GetValue()),
             w=f(self.twidth.GetValue()),
             sp=f(self.guard.GetValue()),
             n=int(float(self.turns.GetValue())),
+            corner_type = corner_type,
             start=start,
             layer_name=self.layer_choice.GetStringSelection(),
             center_nm=self.center_nm,  # remains None → Run() uses entered mm
@@ -229,10 +432,590 @@ class ParamsDialog(wx.Dialog):
 
 
 # ---------------------- Geometry routines ----------------------
+def create_left_center_single(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
+                               w_length: int, w_height: int, r_corner: int, clearance: int,
+                               track_width: int, track_spacing: int):
+    """Draw a single-turn rectangle winding starting from the left-center.
+    Handles the left-side start/return segment separation correctly for any
+    trace width: the two stub ends are separated centre-to-centre by exactly
+    (track_width + track_spacing), so their rounded KiCad caps are
+    track_spacing apart with no overlap.
+
+    :param board: Current board instance
+    :type: pcbnew.BOARD
+    :param layer: Target KiCad layer ID (e.g., pcbnew.F_Cu).
+    :type layer: int
+    :param center: Center point of the winding on board (internal units, nm)
+    :type: pcbnew.VECTOR2I
+    :param w_length: Core length (center-leg), diameter for cylindrical cores
+    :type: int (internal units, nm)
+    :param w_height: Core width (center-leg), diameter for cylindrical cores
+    :type: int (internal units, nm)
+    :param r_corner: Radius of the arc forming the corners
+    :type: int (internal units, nm)
+    :param clearance: Spacing between the core center leg and the inner winding
+    :type: int (internal units, nm)
+    :param track_width: Width of the copper trace
+    :type: int (internal units, nm)
+    :param track_spacing: Minimum spacing between adjacent trace edges
+    :type: int (internal units, nm)
+    """
+
+    # Validation that the inner winding corner does not intrude into the
+    # rectangular core corner
+    ok, msg = validate_rounded_corner_core_clearance(r_corner, clearance)
+
+    if not ok:
+        wx.MessageBox(
+            msg,
+            "Rounded Corner Geometry Error",
+            wx.OK | wx.ICON_ERROR
+        )
+        return
+
+    radius = min(r_corner, w_length // 2, w_height // 2)
+    t_width = track_width
+    Clearance = clearance
+
+    f_length = w_length - 2 * radius  # straight horizontal portion length
+    f_height = w_height - 2 * radius  # straight vertical portion length
+
+    ax, ay = center.x, center.y
+    radius_now = radius + Clearance + (t_width // 2)  # radius of the single corner arc
+
+    #  Centre-to-centre offset between the two left stubs
+    # KiCad caps each segment end with a semicircle of radius t_width/2.
+    # For the cap edges to be exactly track_spacing apart the centres must be
+    # track_width + track_spacing apart, so each stub shifts t_width//2 + t_spacing//2
+    # away from ay.  Using integer division on the full sum avoids the
+    # asymmetry that caused the previous half_gap rounding issue.
+    half_sep = (t_width + track_spacing) // 2
+
+    # Clamp: the stub must not push the arc centre outside the vertical extent
+    # of the winding (it would pull the bottom-left arc off the core corner).
+    max_half = (w_height // 2) + Clearance + (t_width // 2) - radius_now
+    half_sep = min(half_sep, max(0, max_half))
+
+    angle = 90  # degrees; may be reduced below if track width is large
+    #if radius_now > ((w_height // 2) + Clearance + (t_width // 2)):
+    # for large trace width adjust the angle to avoid overlap
+    if t_width // 2 > w_height // 2 - radius:
+        ratio = 1.0 - float(((w_height // 2) + Clearance - (track_spacing // 2))) / float(radius_now)
+        ratio = max(-1.0, min(1.0, ratio))
+        angle = int(round(180.0 * math.acos(ratio) / math.pi))
+
+    #  Starting coordinates
+    # Start stub: centre is at ay + half_sep (below centre-line)
+    now_x = ax - (w_length // 2) - Clearance - (t_width // 2)
+    now_y = ay + half_sep  # start stub centre-y
+
+    #  Start stub: downward segment to bottom-left arc tangent
+    if angle == 90:
+        p1 = v2(now_x, now_y)
+        p2 = v2(now_x, now_y + (f_height // 2) - half_sep)  # reach arc tangent
+        add_track(board, p1, p2, layer, t_width)
+        now_y = p2.y
+
+    #  Arc bottom-left
+    c1 = v2(now_x + radius_now, now_y)
+    add_arc(board, c1, radius_now, 90, 90 + angle, layer, t_width)
+    now_x = now_x + radius_now
+    now_y = now_y + radius_now
+
+    #  Bottom straight
+    add_track(board, v2(now_x, now_y), v2(now_x + f_length, now_y), layer, t_width)
+    now_x = now_x + f_length
+
+    #  Arc bottom-right
+    c2 = v2(now_x, now_y - radius_now)
+    add_arc(board, c2, radius_now, 0, 90, layer, t_width)
+    now_x = now_x + radius_now
+    now_y = now_y - radius_now
+
+    #  Right vertical straight
+    add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
+    now_y = now_y - f_height
+
+    #  Arc top-right
+    c3 = v2(now_x - radius_now, now_y)
+    add_arc(board, c3, radius_now, 270, 360, layer, t_width)
+    now_x = now_x - radius_now
+    now_y = now_y - radius_now
+
+    #  Top straight (rad_inc = 0 for single turn, no length extension)
+    add_track(board, v2(now_x, now_y), v2(now_x - f_length, now_y), layer, t_width)
+    now_x = now_x - f_length
+
+    #  Arc top-left (radius unchanged — single turn, no increment)
+    c4 = v2(now_x, now_y + radius_now)
+    add_arc(board, c4, radius_now, 270 - angle, 270, layer, t_width)
+    now_x = now_x - radius_now
+    now_y = now_y + radius_now
+
+    #  Return stub: upward segment ending at ay - half_sep
+    # Centre-to-centre distance between stubs = 2 * half_sep = t_width + t_spacing
+    # Cap edges are therefore exactly track_spacing apart.
+    if angle == 90:
+        p3 = v2(now_x, now_y)
+        p4 = v2(now_x, ay - half_sep)  # return stub centre-y
+        add_track(board, p3, p4, layer, t_width)
+
+# def create_left_top_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
+#                     w_length: int, w_height: int, clearance: int,
+#                     track_width: int, track_spacing: int, n: int):
+#     """Draw a rectangle spiral starting from the left-bottom. All internal geometry is integer nanometers.
+#
+#     :param board: Current board instance
+#     :type: pcbnew.BOARD
+#     :param layer: Target KiCad layer ID (e.g., pcbnew.F_Cu).
+#     :type layer: int
+#     :param center: Center point of the winding on board (internal units, nm)
+#     :type: pcbnew.VECTOR2I
+#     :param w_length: Core length (center-leg), diameter for cylindrical cores
+#     :type: int (internal units, nm)
+#     :param w_height: Core width (center-leg), diameter for cylindrical cores
+#     :type: int (internal units, nm)
+#     :param r_corner: Radius of the arc forming the corners
+#     :type: int (internal units, nm)
+#     :param clearance: spacing between the core center leg and the inner winding
+#     :type: int (internal units, nm)
+#     :param track_width: Width of the copper trace
+#     :type: int (internal units, nm)
+#     :param track_spacing: Spacing between two adjacent traces
+#                           Spacing between two adjacent turns on the same layer
+#     :type: int (internal units, nm)
+#     :param n: number of turns
+#     :type: int (internal units, nm)
+#     """
+#     # if n == 1:
+#     #     create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
+#     #     return
+#
+#     t_width = track_width
+#     Clearance = clearance
+#
+#     track_spacing = track_spacing
+#     track_offset = Clearance + t_width
+#     outward_increment = track_spacing + t_width
+#
+#     ax, ay = center.x, center.y
+#     # f_length = w_length + 2 * track_offset
+#     # f_height = w_height + 2 * track_offset
+#
+#     half_length = w_length // 2
+#     half_height = w_height // 2
+#
+#     # radius_now = radius + Clearance + (t_width // 2)
+#
+#     # First turn centerline rectangle
+#     # Edges defining the centerline of the rectangle formed by the first (inner) turn
+#     left = ax - half_length - track_offset
+#     right = ax + half_length + track_offset
+#     top = ay - half_height - track_offset
+#     bottom = ay + half_height + track_offset
+#
+#     current_length = right - left
+#     current_height = bottom - top
+#
+#     now_x = left
+#     now_y = top + track_offset
+#
+#     for _ in range(n):
+#         # add a slight offset for the first turn to prevent overlap
+#         # first_turn_offset = 0
+#         # if _ == 0:
+#         #     first_turn_offset = outward_increment
+#
+#         # Left straight
+#         add_rect(board, now_x, now_y, t_width, current_height - track_offset,  layer)
+#         now_y = now_y + current_height - track_offset
+#
+#         # # Arc bottom-left
+#         # add_arc(board, v2(now_x + radius_now, now_y), radius_now, 90, 180, layer, t_width)
+#         # now_x = now_x + radius_now
+#         # now_y = now_y + radius_now
+#
+#         # Bottom straight
+#         add_rect(board, now_x, now_y - t_width, current_length, t_width, layer)
+#         # add_track(board, v2(now_x, now_y), v2(now_x + f_length, now_y), layer, t_width)
+#         now_x = now_x + current_length
+#
+#         # Arc bottom-right
+#         # add_arc(board, v2(now_x, now_y - radius_now), radius_now, 0, 90, layer, t_width)
+#         # now_x = now_x + radius_now
+#         # now_y = now_y - radius_now
+#
+#         # Right vertical straight
+#         add_rect(board, now_x - t_width, now_y, t_width, -current_height, layer)
+#         #add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
+#         now_y = now_y - current_height
+#
+#         # Arc top-right
+#         # add_arc(board, v2(now_x - radius_now, now_y), radius_now, 270, 360, layer, t_width)
+#         # now_x = now_x - radius_now
+#         # now_y = now_y - radius_now
+#
+#         # Top straight
+#         # Break here for single turn
+#         if n == 1:
+#             #add_track(board, v2(now_x, now_y), v2(now_x - f_length - t_width // 2 - track_spacing // 2, now_y), layer, t_width)
+#             add_rect(board, now_x, now_y, -current_length, t_width, layer)
+#             break
+#
+#         # Top straight
+#         add_rect(board, now_x, now_y, -current_length - t_width - track_spacing, t_width, layer)
+#         #add_track(board, v2(now_x, now_y), v2(now_x - f_length - t_width - track_spacing, now_y), layer, t_width)
+#         now_x = now_x - current_length - t_width - track_spacing
+#
+#         # Arc top-left
+#         # add_arc(board, v2(now_x, now_y + radius_now), radius_now, 180, 270, layer, t_width)
+#         # now_x = now_x - radius_now
+#         # now_y = now_y + radius_now
+#
+#         #outward_increment += track_spacing + t_width
+#         # Extend the rectangle outward for the next turn
+#         left -= outward_increment
+#         right += outward_increment
+#         top -= outward_increment
+#         bottom += outward_increment
+#
+#         current_length = right - left
+#         current_height = bottom - top
+
+def create_left_top_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I", w_length: int,
+                                 w_height: int, clearance: int, track_width: int, track_spacing: int, n: int):
+    """
+    Draw a rectangular planar winding with true right-angled corners
+    using filled rectangles. Starts from left-top and grows outward.
+    All units are internal KiCad units (nm).
+
+    :param board: Current board instance
+    :type: pcbnew.BOARD
+    :param layer: Target KiCad layer ID (e.g., pcbnew.F_Cu).
+    :type layer: int
+    :param center: Center point of the winding on board (internal units, nm)
+    :type: pcbnew.VECTOR2I
+    :param w_length: Core length (center-leg), diameter for cylindrical cores
+    :type: int (internal units, nm)
+    :param w_height: Core width (center-leg), diameter for cylindrical cores
+    :type: int (internal units, nm)
+    :param clearance: spacing between the core center leg and the inner winding
+    :type: int (internal units, nm)
+    :param track_width: Width of the copper trace
+    :type: int (internal units, nm)
+    :param track_spacing: Spacing between two adjacent traces
+                          Spacing between two adjacent turns on the same layer
+    :type: int (internal units, nm)
+    :param n: number of turns
+    :type: int (internal units, nm)
+    
+    """
+
+    if n < 1:
+        wx.MessageBox("Number of turns must be >= 1",
+                      "Geometry Error",
+                      wx.OK | wx.ICON_ERROR)
+        return
+
+    t_width = track_width
+    outward_increment = track_width + track_spacing
+
+    cx, cy = center.x, center.y
+    half_w = w_length // 2
+    half_h = w_height // 2
+
+    trace_offset = clearance + (t_width // 2)
+
+    # First turn centerline rectangle
+    left   = cx - half_w - trace_offset
+    right  = cx + half_w + trace_offset
+    top    = cy - half_h - trace_offset
+    bottom = cy + half_h + trace_offset
+
+    # Start at left-top inner side
+    now_x = left
+    now_y = cy - half_h
+
+    for turn in range(n):
+
+        first_turn_offset = 0
+        if turn == 0:
+            first_turn_offset = t_width // 2
+
+        # ---------------------------------
+        # Left vertical
+        # ---------------------------------
+        y1 = now_y + first_turn_offset
+        y2 = bottom
+        add_rect_vertical(board, now_x, y1, y2, t_width, layer)
+        now_y = bottom
+
+        # ---------------------------------
+        # Bottom horizontal
+        # ---------------------------------
+        add_rect_horizontal(board, now_x, right, now_y, t_width, layer)
+        now_x = right
+
+        # ---------------------------------
+        # Right vertical
+        # ---------------------------------
+        add_rect_vertical(board, now_x, now_y, top, t_width, layer)
+        now_y = top
+
+        # ---------------------------------
+        # Single turn exit
+        # ---------------------------------
+        if n == 1:
+            end_x = left
+            add_rect_horizontal(board, now_x, end_x, now_y, t_width, layer)
+            break
+
+        # ---------------------------------
+        # Top horizontal
+        # ---------------------------------
+        next_left = left - outward_increment
+        if turn == n - 1:
+            next_left = left
+        add_rect_horizontal(board, now_x, next_left, now_y, t_width, layer)
+        now_x = next_left
+
+        # Expand rectangle outward
+        left   -= outward_increment
+        right  += outward_increment
+        top    -= outward_increment
+        bottom += outward_increment
+
+def create_left_bottom_right_angled(board: "pcbnew.BOARD",
+                                    layer: int,
+                                    center: "pcbnew.VECTOR2I",
+                                    w_length: int,
+                                    w_height: int,
+                                    clearance: int,
+                                    track_width: int,
+                                    track_spacing: int,
+                                    n: int):
+    """
+    Draw a rectangular planar winding with true right-angled corners
+    using filled rectangles.
+
+    Start position: left-bottom
+    Path order per turn:
+        bottom -> right -> top -> left
+    The winding grows outward from the inner window.
+
+    All units are internal KiCad units (nm).
+    
+    :param board: Current board instance
+    :type: pcbnew.BOARD
+    :param layer: Target KiCad layer ID (e.g., pcbnew.F_Cu).
+    :type layer: int
+    :param center: Center point of the winding on board (internal units, nm)
+    :type: pcbnew.VECTOR2I
+    :param w_length: Core length (center-leg), diameter for cylindrical cores
+    :type: int (internal units, nm)
+    :param w_height: Core width (center-leg), diameter for cylindrical cores
+    :type: int (internal units, nm)
+    :param clearance: spacing between the core center leg and the inner winding
+    :type: int (internal units, nm)
+    :param track_width: Width of the copper trace
+    :type: int (internal units, nm)
+    :param track_spacing: Spacing between two adjacent traces
+                          Spacing between two adjacent turns on the same layer
+    :type: int (internal units, nm)
+    :param n: number of turns
+    :type: int (internal units, nm)
+    """
+
+    if n < 1:
+        wx.MessageBox("Number of turns must be >= 1",
+                      "Geometry Error",
+                      wx.OK | wx.ICON_ERROR)
+        return
+
+    t_width = track_width
+    outward_increment = track_width + track_spacing
+
+    cx, cy = center.x, center.y
+    half_w = w_length // 2
+    half_h = w_height // 2
+
+    trace_offset = clearance + (t_width // 2)
+
+    # First-turn centerline rectangle around the core/window
+    left   = cx - half_w - trace_offset
+    right  = cx + half_w + trace_offset
+    top    = cy - half_h - trace_offset
+    bottom = cy + half_h + trace_offset
+
+    # Start at left-bottom on the first turn
+    now_x = left + trace_offset
+    now_y = bottom
+
+    for turn in range(n):
+
+        first_turn_offset = 0
+        if turn == 0:
+            first_turn_offset = t_width // 2
+
+        # ---------------------------------
+        # Bottom horizontal
+        # ---------------------------------
+        add_rect_horizontal(board, now_x + first_turn_offset, right, now_y, t_width, layer)
+        now_x = right
+
+        # ---------------------------------
+        # Right vertical
+        # ---------------------------------
+        add_rect_vertical(board, now_x, now_y, top, t_width, layer)
+        now_y = top
+
+        # ---------------------------------
+        # Top horizontal
+        # ---------------------------------
+        #next_left = left - outward_increment
+        add_rect_horizontal(board, now_x, left, now_y, t_width, layer)
+        now_x = left
+
+        # ---------------------------------
+        # Single turn exit
+        # ---------------------------------
+        if n == 1:
+            end_y = bottom
+            add_rect_vertical(board, now_x, now_y, end_y, t_width, layer)
+            break
+
+        # ---------------------------------
+        # Left vertical
+        # ---------------------------------
+        next_bottom = bottom + outward_increment
+        if turn == n - 1:
+            next_bottom = bottom
+        add_rect_vertical(board, now_x, now_y, next_bottom, t_width, layer)
+        now_y = next_bottom
+
+        # Expand outward for next turn
+        left   -= outward_increment
+        right  += outward_increment
+        top    -= outward_increment
+        bottom += outward_increment
+
+def create_left_center_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I", w_length: int,
+                                    w_height: int, clearance: int, track_width: int, track_spacing: int, n: int):
+    """
+    Draw a rectangular planar winding with true right-angled corners
+    using filled rectangles.
+
+    Start position: left-center
+    Path order per turn:
+        left-down -> bottom -> right-up -> top -> left-down
+    The winding grows outward from the inner window.
+
+    All units are internal KiCad units (nm).
+
+    :param board: Current board instance
+    :type: pcbnew.BOARD
+    :param layer: Target KiCad layer ID (e.g., pcbnew.F_Cu).
+    :type layer: int
+    :param center: Center point of the winding on board (internal units, nm)
+    :type: pcbnew.VECTOR2I
+    :param w_length: Core length (center-leg), diameter for cylindrical cores
+    :type: int (internal units, nm)
+    :param w_height: Core width (center-leg), diameter for cylindrical cores
+    :type: int (internal units, nm)
+    :param clearance: spacing between the core center leg and the inner winding
+    :type: int (internal units, nm)
+    :param track_width: Width of the copper trace
+    :type: int (internal units, nm)
+    :param track_spacing: Spacing between two adjacent traces
+                          Spacing between two adjacent turns on the same layer
+    :type: int (internal units, nm)
+    :param n: number of turns
+    :type: int (internal units, nm)
+    """
+
+    if n < 1:
+        wx.MessageBox("Number of turns must be >= 1",
+                      "Geometry Error",
+                      wx.OK | wx.ICON_ERROR)
+        return
+
+    t_width = track_width
+    outward_increment = track_width + track_spacing
+
+    cx, cy = center.x, center.y
+    half_w = w_length // 2
+    half_h = w_height // 2
+
+    trace_offset = clearance + (t_width // 2)
+
+    # First-turn centerline rectangle
+    left   = cx - half_w - trace_offset
+    right  = cx + half_w + trace_offset
+    top    = cy - half_h - trace_offset
+    bottom = cy + half_h + trace_offset
+
+    # Start at left-center
+    now_x = left
+    now_y = cy + t_width // 2
+
+    # Separation for single-turn entry/exit
+    single_gap = track_spacing // 2
+
+    for turn in range(n):
+
+        # ---------------------------------
+        # Left vertical: center -> bottom
+        # ---------------------------------
+        start_y = now_y
+        if n == 1: # and turn == 0:
+            start_y = now_y + single_gap
+
+        add_rect_vertical(board, now_x, start_y, bottom, t_width, layer)
+        now_y = bottom
+
+        # ---------------------------------
+        # Bottom horizontal
+        # ---------------------------------
+        add_rect_horizontal(board, now_x, right, now_y, t_width, layer)
+        now_x = right
+
+        # ---------------------------------
+        # Right vertical
+        # ---------------------------------
+        add_rect_vertical(board, now_x, now_y, top, t_width, layer)
+        now_y = top
+
+        # ---------------------------------
+        # Top horizontal
+        # ---------------------------------
+        next_left = left - (0 if n == 1 else outward_increment)
+        add_rect_horizontal(board, now_x, next_left, now_y, t_width, layer)
+        now_x = next_left
+
+        # ---------------------------------
+        # Left vertical: top -> center or next bottom
+        # ---------------------------------
+        if n == 1 or turn == n - 1:
+            end_y = cy - single_gap - t_width // 2
+            add_rect_vertical(board, now_x, now_y, end_y, t_width, layer)
+            break
+        else:
+            next_bottom = bottom + outward_increment
+            add_rect_vertical(board, now_x, now_y, next_bottom, t_width, layer)
+            now_y = next_bottom
+
+        # Expand outward for next turn
+        left   -= outward_increment
+        right  += outward_increment
+        top    -= outward_increment
+        bottom += outward_increment
+
 def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
-                       w_length: int, w_height: int, r_corner:int, clearance: int,
+                       w_length: int, w_height: int, r_corner: int, clearance: int,
                        track_width: int, track_spacing: int, n: int):
     """Draw a rectangle spiral starting from the left-center. All internal geometry is integer nanometers.
+    For n == 1 delegates to create_left_center_single() which handles the
+    left-side stub separation correctly for any trace width.
 
     :param board: Current board instance
     :type: pcbnew.BOARD
@@ -251,92 +1034,97 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     :param track_width: Width of the copper trace
     :type: int (internal units, nm)
     :param track_spacing: Spacing between two adjacent traces
-                          Spacing between two adjacent turns on the same layer
     :type: int (internal units, nm)
     :param n: number of turns
     :type: int (internal units, nm)
     """
 
+    # if r_corner == 0:
+    #     create_left_center_right_angled(board, layer, center, w_length, w_height, clearance, track_width, track_spacing, n)
+    #     return
+
+    if n == 1:
+        create_left_center_single(board, layer, center, w_length, w_height,
+                                  r_corner, clearance, track_width, track_spacing)
+        return
+
+    # Validation that the inner winding corner does not intrude into the
+    # rectangular core corner
+    ok, msg = validate_rounded_corner_core_clearance(r_corner, clearance)
+
+    if not ok:
+        wx.MessageBox(
+            msg,
+            "Rounded Corner Geometry Error",
+            wx.OK | wx.ICON_ERROR
+        )
+        return
+
+    #  Multi-turn path (n > 1)
     radius = min(r_corner, w_length // 2, w_height // 2)
     t_width = track_width
-    Clearance = clearance # spacing between the inner core and inner turn
+    Clearance = clearance
 
-    f_length = w_length - 2 * radius # length of the straight portion of the trace (placed horizontally)
-    f_height = w_height - 2 * radius # length of the straight portion of the trace (placed vertically)
+    f_length = w_length - 2 * radius
+    f_height = w_height - 2 * radius
 
-    t_spacing = track_spacing # Spacing between the turns
-    windings = n # number of turns
+    t_spacing = track_spacing
+    windings = n
 
-    ax, ay = center.x, center.y # center point (x,y) of the winding
-    now_x = ax - (w_length // 2) - Clearance - (t_width // 2) # Starting point of the trace on the x-axis
-    now_y = ay # Starting point of the trace on the y-axis
-    #TODO resolve first turn arc clearance issue
-    # The arc and the corners of the core touches or lacks correct clearance
-    radius_now = radius + Clearance + (t_width // 2)  # adjusted radius of the first arc
+    ax, ay = center.x, center.y
+    now_x = ax - (w_length // 2) - Clearance - (t_width // 2)
+    now_y = ay #TODO adjust the y start point by half the trace width
+    radius_now = radius + Clearance + (t_width // 2)
 
     angle = 90
-    rad_inc1 = (t_spacing // 2) + (t_width // 2) # increment for last arc in each turn for n > 1
+    rad_inc1 = (t_spacing // 2) + (t_width // 2)
     rad_inc2 = rad_inc1
 
-    limit = (w_height // 2) + Clearance + (t_width // 2)
-    if (radius_now + rad_inc1) > limit:
-        rad_inc1 = limit - radius_now
-        rad_inc2 = rad_inc2 - rad_inc1
-
-    if windings == 1:
-        now_y = now_y + (t_width // 2) + (t_spacing // 2)
-        rad_inc1 = 0; rad_inc2 = 0
-
-    if radius_now > ((w_height // 2) + Clearance - (t_spacing // 2)):
+    if radius_now > ((w_height // 2) + Clearance + (t_width // 2)):
         ratio = 1.0 - float(((w_height // 2) + Clearance - (t_spacing // 2))) / float(radius_now)
         ratio = max(-1.0, min(1.0, ratio))
         angle = int(round(180.0 * math.acos(ratio) / math.pi))
 
     for _ in range(windings):
         if angle == 90:
-            p1 = v2(now_x, now_y) # Start point for initial straight trace
-            p2 = v2(now_x, now_y + (f_height // 2)) # End point for initial straight trace
-            if windings == 1: #TODO maybe also adjust start point
-                p2 = v2(p2.x, p2.y - ((t_width // 2) - (t_spacing // 2))) # Adjust end point for single turn
+            p1 = v2(now_x, now_y)
+            p2 = v2(now_x, now_y + (f_height // 2))
             add_track(board, p1, p2, layer, t_width)
             now_y = now_y + (f_height // 2)
-            if windings == 1:
-                now_y = now_y - (t_width // 2) - (t_spacing // 2)
 
-        # Add arc bottom left
-        c1 = v2(now_x + radius_now, now_y) # center of the first arc
+        # Arc bottom-left
+        c1 = v2(now_x + radius_now, now_y)
         add_arc(board, c1, radius_now, 90, 90 + angle, layer, t_width)
         now_x = now_x + radius_now
         now_y = now_y + radius_now
 
-        # Add straight trace (placed horizontally on the lower side)
+        # Bottom straight
         add_track(board, v2(now_x, now_y), v2(now_x + f_length, now_y), layer, t_width)
         now_x = now_x + f_length
 
-        # Add arc (curved trace) bottom right
+        # Arc bottom-right
         c2 = v2(now_x, now_y - radius_now)
         add_arc(board, c2, radius_now, 0, 90, layer, t_width)
         now_x = now_x + radius_now
         now_y = now_y - radius_now
 
-        # Add straight trace (placed vertically on the right side)
+        # Right vertical straight
         add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
         now_y = now_y - f_height
 
-        # Add arc top right
+        # Arc top-right
         c3 = v2(now_x - radius_now, now_y)
         add_arc(board, c3, radius_now, 270, 360, layer, t_width)
         now_x = now_x - radius_now
         now_y = now_y - radius_now
 
-        # Add straight trace (placed horizontally on the upper side)
+        # Top straight
         add_track(board, v2(now_x, now_y), v2(now_x - f_length - rad_inc2, now_y), layer, t_width)
         now_x = now_x - f_length - rad_inc2
 
+        radius_now = radius_now + rad_inc1
 
-        radius_now = radius_now + rad_inc1 # Increment the radius of the arc to space out the next turn
-
-        # Add arc top left
+        # Arc top-left
         c4 = v2(now_x, now_y + radius_now)
         add_arc(board, c4, radius_now, 270 - angle, 270, layer, t_width)
         now_x = now_x - radius_now
@@ -345,8 +1133,6 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
         if angle == 90:
             p3 = v2(now_x, now_y)
             p4 = v2(now_x, ay)
-            if windings == 1:
-                p4 = v2(p4.x, p4.y - ((t_width // 2) + (t_spacing // 2)))
             add_track(board, p3, p4, layer, t_width)
             now_y = ay
 
@@ -380,8 +1166,24 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     :param n: number of turns
     :type: int (internal units, nm)
     """
-    if n == 1:
-        create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
+    # if n == 1:
+    #     create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
+    #     return
+
+    # if r_corner == 0:
+    #     create_left_bottom_right_angled(board, layer, center, w_length, w_height, clearance, track_width, track_spacing, n)
+    #     return
+
+    # Validation that the inner winding corner does not intrude into the
+    # rectangular core corner
+    ok, msg = validate_rounded_corner_core_clearance(r_corner, clearance)
+
+    if not ok:
+        wx.MessageBox(
+            msg,
+            "Rounded Corner Geometry Error",
+            wx.OK | wx.ICON_ERROR
+        )
         return
 
     radius = min(r_corner, w_length // 2, w_height // 2)
@@ -404,27 +1206,38 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
         if _ == 0:
             first_turn_offset = t_width // 2
 
-
+        # Bottom straight
         add_track(board, v2(now_x + first_turn_offset, now_y), v2(now_x + f_length, now_y), layer, t_width)
         now_x = now_x + f_length
 
+        # Arc bottom-right
         add_arc(board, v2(now_x, now_y - radius_now), radius_now, 0, 90, layer, t_width)
         now_x = now_x + radius_now
         now_y = now_y - radius_now
 
+        # Right vertical straight
         add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
         now_y = now_y - f_height
 
+        # Arc top-right
         add_arc(board, v2(now_x - radius_now, now_y), radius_now, 270, 360, layer, t_width)
         now_x = now_x - radius_now
         now_y = now_y - radius_now
 
+        # Top straight
         add_track(board, v2(now_x, now_y), v2(now_x - f_length, now_y), layer, t_width)
         now_x = now_x - f_length
 
+        # Arc top-left
         add_arc(board, v2(now_x, now_y + radius_now), radius_now, 180, 270, layer, t_width)
         now_x = now_x - radius_now
         now_y = now_y + radius_now
+
+        # Left straight
+        # Break here for single turn
+        if n == 1:
+            add_track(board, v2(now_x, now_y), v2(now_x, now_y + f_height + t_width // 2 + t_spacing // 2), layer, t_width)
+            break
 
         add_track(board, v2(now_x, now_y), v2(now_x, now_y + f_height + t_width + t_spacing), layer, t_width)
         now_y = now_y + f_height + t_width + t_spacing
@@ -463,8 +1276,23 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
     :param n: number of turns
     :type: int (internal units, nm)
     """
-    if n == 1:
-        create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
+    # if n == 1:
+    #     create_left_center(board, layer, center, w_length, w_height, r_corner, clearance, track_width, track_spacing, n)
+    #     return
+    # if r_corner == 0:
+    #     create_left_top_right_angled(board, layer, center, w_length, w_height, clearance, track_width, track_spacing, n)
+    #     return
+
+    # Validation that the inner winding corner does not intrude into the
+    # rectangular core corner
+    ok, msg = validate_rounded_corner_core_clearance(r_corner, clearance)
+
+    if not ok:
+        wx.MessageBox(
+            msg,
+            "Rounded Corner Geometry Error",
+            wx.OK | wx.ICON_ERROR
+        )
         return
 
     radius = min(r_corner, w_length // 2, w_height // 2)
@@ -487,31 +1315,44 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
         if _ == 0:
             first_turn_offset = t_width // 2
 
-
+        # Left straight
         add_track(board, v2(now_x, now_y + first_turn_offset), v2(now_x, now_y + f_height), layer, t_width)
         now_y = now_y + f_height
 
+        # Arc bottom-left
         add_arc(board, v2(now_x + radius_now, now_y), radius_now, 90, 180, layer, t_width)
         now_x = now_x + radius_now
         now_y = now_y + radius_now
 
+        # Bottom straight
         add_track(board, v2(now_x, now_y), v2(now_x + f_length, now_y), layer, t_width)
         now_x = now_x + f_length
 
+        # Arc bottom-right
         add_arc(board, v2(now_x, now_y - radius_now), radius_now, 0, 90, layer, t_width)
         now_x = now_x + radius_now
         now_y = now_y - radius_now
 
+        # Right vertical straight
         add_track(board, v2(now_x, now_y), v2(now_x, now_y - f_height), layer, t_width)
         now_y = now_y - f_height
 
+        # Arc top-right
         add_arc(board, v2(now_x - radius_now, now_y), radius_now, 270, 360, layer, t_width)
         now_x = now_x - radius_now
         now_y = now_y - radius_now
 
+        # Top straight
+        # Break here for single turn
+        if n == 1:
+            add_track(board, v2(now_x, now_y), v2(now_x - f_length - t_width // 2 - track_spacing // 2, now_y), layer, t_width)
+            break
+
+        # Top straight
         add_track(board, v2(now_x, now_y), v2(now_x - f_length - t_width - track_spacing, now_y), layer, t_width)
         now_x = now_x - f_length - t_width - track_spacing
 
+        # Arc top-left
         add_arc(board, v2(now_x, now_y + radius_now), radius_now, 180, 270, layer, t_width)
         now_x = now_x - radius_now
         now_y = now_y + radius_now
@@ -556,6 +1397,7 @@ class PlanarRectSpiralLC(pcbnew.ActionPlugin):
         n  = max(1, int(P["n"]))
         start = int(P["start"])  # 0=LT, 1=LC, 2=LB
         layer = layer_id(board, P["layer_name"])
+        corner_type = P["corner_type"]
 
         # Optional debug tick at center
         if debug_test:
@@ -565,12 +1407,49 @@ class PlanarRectSpiralLC(pcbnew.ActionPlugin):
         # 4) Draw spiral
         tx = pcbnew.Transaction(board, "Planar Winding") if hasattr(pcbnew, "Transaction") else None
         try:
-            if start == 0:
-                create_left_top(board, layer, center, sx, sy, r, cin, w, sp, n)
-            elif start == 2:
-                create_left_bottom(board, layer, center, sx, sy, r, cin, w, sp, n)
+            if corner_type == "Rounded Corner":
+
+                if start == 0:
+                    create_left_top(
+                        board, layer, center,
+                        sx, sy, r, cin, w, sp, n)
+
+                elif start == 1:
+                    create_left_center(
+                        board, layer, center,
+                        sx, sy, r, cin, w, sp, n)
+
+                elif start == 2:
+                    create_left_bottom(
+                        board, layer, center,
+                        sx, sy, r, cin, w, sp, n)
+
             else:
-                create_left_center(board, layer, center, sx, sy, r, cin, w, sp, n)
+
+                if start == 0:
+                    create_left_top_right_angled(
+                        board, layer, center,
+                        sx, sy, cin, w, sp, n
+                    )
+
+                elif start == 1:
+                    create_left_center_right_angled(
+                        board, layer, center,
+                        sx, sy, cin, w, sp, n
+                    )
+
+                elif start == 2:
+                    create_left_bottom_right_angled(
+                        board, layer, center,
+                        sx, sy, cin, w, sp, n
+                    )
+            # if start == 0:
+            #     create_left_top(board, layer, center, sx, sy, r, cin, w, sp, n)
+            # elif start == 2:
+            #     create_left_bottom(board, layer, center, sx, sy, r, cin, w, sp, n)
+            # else:
+            #     create_left_center(board, layer, center, sx, sy, r, cin, w, sp, n)
+
         finally:
             if tx: tx.Commit()
         pcbnew.Refresh()
