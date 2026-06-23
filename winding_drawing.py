@@ -1,6 +1,6 @@
 import pcbnew
 import math
-from geometry import v2, degree2rad, transform_point
+from winding_geometry import v2, degree2rad, transform_point
 
 def add_track(board, p1, p2, layer, width):
     """Add a straight copper TRACK segment on the board.

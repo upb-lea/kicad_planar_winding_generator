@@ -1,6 +1,6 @@
 
 import wx
-from drawing import add_rect_vertical, add_rect_horizontal
+from winding_drawing import add_rect_vertical, add_rect_horizontal
 
 # ----------------------Rectangular Geometry routines ----------------------
 def create_left_top_sharp(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I", w_length: int,

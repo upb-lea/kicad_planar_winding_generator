@@ -1,7 +1,7 @@
 import wx
 import math
-from drawing import add_track, add_arc, add_arc_transformed_points
-from geometry import v2, validate_rounded_corner_core_clearance, transform_point
+from winding_drawing import add_track, add_arc, add_arc_transformed_points
+from winding_geometry import v2, validate_rounded_corner_core_clearance, transform_point
 
 
 # ----------------------Rounded Geometry routines ----------------------

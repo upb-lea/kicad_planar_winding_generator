@@ -2,9 +2,9 @@
 import pcbnew
 import os
 import wx
-from gui import  ParamsDialog
-from geometry import v2
-from drawing import add_track
+from winding_gui import  ParamsDialog
+from winding_geometry import v2
+from winding_drawing import add_track
 from rectangular_windings import (create_left_bottom_sharp,
                                   create_left_center_sharp,
                                   create_left_top_sharp)
