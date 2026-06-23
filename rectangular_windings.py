@@ -3,7 +3,7 @@ import wx
 from drawing import add_rect_vertical, add_rect_horizontal
 
 # ----------------------Rectangular Geometry routines ----------------------
-def create_left_top_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I", w_length: int,
+def create_left_top_sharp(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I", w_length: int,
                                  w_height: int, clearance: int, track_width: int, track_spacing: int, n: int,
                                  mirror_x=False, mirror_y=False):
     """
@@ -110,7 +110,7 @@ def create_left_top_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcb
         top    -= outward_increment
         bottom += outward_increment
 
-def create_left_bottom_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I", w_length: int,
+def create_left_bottom_sharp(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I", w_length: int,
                                     w_height: int, clearance: int, track_width: int, track_spacing: int, n: int,
                                     mirror_x=False, mirror_y=False):
     """
@@ -143,6 +143,10 @@ def create_left_bottom_right_angled(board: "pcbnew.BOARD", layer: int, center: "
     :type: int (internal units, nm)
     :param n: number of turns
     :type: int (internal units, nm)
+    :param mirror_x: Mirror about X-axis through center.
+    :type mirror_x: bool
+    :param mirror_y: Mirror about Y-axis through center.
+    :type mirror_y: bool
     """
 
     if n < 1:
@@ -218,7 +222,7 @@ def create_left_bottom_right_angled(board: "pcbnew.BOARD", layer: int, center: "
         top    -= outward_increment
         bottom += outward_increment
 
-def create_left_center_right_angled(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I", w_length: int,
+def create_left_center_sharp(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I", w_length: int,
                                     w_height: int, clearance: int, track_width: int, track_spacing: int, n: int,
                                     mirror_x=False, mirror_y=False):
     """
@@ -251,6 +255,10 @@ def create_left_center_right_angled(board: "pcbnew.BOARD", layer: int, center: "
     :type: int (internal units, nm)
     :param n: number of turns
     :type: int (internal units, nm)
+    :param mirror_x: Mirror about X-axis through center.
+    :type mirror_x: bool
+    :param mirror_y: Mirror about Y-axis through center.
+    :type mirror_y: bool
     """
 
     if n < 1:

@@ -1,6 +1,6 @@
 import pcbnew
 import math
-from geometry import v2, d2r, transform_point
+from geometry import v2, degree2rad, transform_point
 
 def add_track(board, p1, p2, layer, width):
     """Add a straight copper TRACK segment on the board.
@@ -47,10 +47,8 @@ def arc_points_from_center(center, radius, angle_start_deg, angle_end_deg):
         Determine the x,y position for a given center, radius and angle
         """
         angle_rad = math.radians(angle_deg)
-        return v2(
-            int(round(center.x + radius * math.cos(angle_rad))),
-            int(round(center.y + radius * math.sin(angle_rad)))
-        )
+        return v2(int(round(center.x + radius * math.cos(angle_rad))),
+                  int(round(center.y + radius * math.sin(angle_rad))))
 
     start = point_at(angle_start_deg)
     mid   = point_at(angle_mid_deg)
@@ -83,12 +81,8 @@ def add_arc_points(board, start, mid, end, layer, width):
     arc.SetEnd(end)
     board.Add(arc)
 
-def add_arc_transformed_points(board, center, radius,
-                               angle_start_deg, angle_end_deg,
-                               layer, width,
-                               mirror_center,
-                               mirror_x=False,
-                               mirror_y=False):
+def add_arc_transformed_points(board, center, radius, angle_start_deg, angle_end_deg,
+                               layer, width, mirror_center, mirror_x=False, mirror_y=False):
     """
     Add an arc after transforming its start/mid/end points.
 
@@ -124,9 +118,9 @@ def add_arc(board, center, radius, ang_start_deg, ang_end_deg, layer, width):
     :type width: float
     :rtype: None
     """
-    a1 = d2r(ang_start_deg)
-    a3 = d2r(ang_end_deg)
-    a2 = d2r((ang_start_deg + ang_end_deg) / 2.0)
+    a1 = degree2rad(ang_start_deg)
+    a3 = degree2rad(ang_end_deg)
+    a2 = degree2rad((ang_start_deg + ang_end_deg) / 2.0)
     start = v2(center.x + radius * math.cos(a1), center.y + radius * math.sin(a1))
     mid   = v2(center.x + radius * math.cos(a2), center.y + radius * math.sin(a2))
     end   = v2(center.x + radius * math.cos(a3), center.y + radius * math.sin(a3))
@@ -165,11 +159,7 @@ def add_rect(board, x, y, w, h, layer):
     poly.SetFilled(True)
     poly.SetLayer(layer)
     poly.SetWidth(0)
-    pts = [v2(x, y),
-           v2(x + w, y),
-           v2(x + w, y + h),
-           v2(x, y + h),
-    ]
+    pts = [v2(x, y), v2(x + w, y), v2(x + w, y + h), v2(x, y + h)]
     poly.SetPolyPoints(pts)
     board.Add(poly)
 

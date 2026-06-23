@@ -5,12 +5,12 @@ import wx
 from gui import  ParamsDialog
 from geometry import v2
 from drawing import add_track
-from rectangular_windings import (create_left_bottom_right_angled,
-                                  create_left_center_right_angled,
-                                  create_left_top_right_angled)
-from rounded_windings import (create_left_bottom,
-                              create_left_center,
-                              create_left_top)
+from rectangular_windings import (create_left_bottom_sharp,
+                                  create_left_center_sharp,
+                                  create_left_top_sharp)
+from rounded_windings import (create_left_bottom_rounded,
+                              create_left_center_rounded,
+                              create_left_top_rounded)
 
 
 # Set True to draw a short line at the chosen center for verification
@@ -85,36 +85,30 @@ class PlanarRectSpiralLC(pcbnew.ActionPlugin):
             if corner_type == "Rounded Corner":
 
                 if start == 0:
-                    create_left_top(board, layer, center, sx, sy, r, cin, w, sp, n,
+                    create_left_top_rounded(board, layer, center, sx, sy, r, cin, w, sp, n,
                                      mirror_x=mirror_x, mirror_y=mirror_y)
 
                 elif start == 1:
-                    create_left_center(board, layer, center, sx, sy, r, cin, w, sp, n,
+                    create_left_center_rounded(board, layer, center, sx, sy, r, cin, w, sp, n,
                                        mirror_x=mirror_x, mirror_y=mirror_y)
 
                 elif start == 2:
-                    create_left_bottom(board, layer, center, sx, sy, r, cin, w, sp, n,
+                    create_left_bottom_rounded(board, layer, center, sx, sy, r, cin, w, sp, n,
                                        mirror_x=mirror_x, mirror_y=mirror_y)
 
             else:
 
                 if start == 0:
-                    create_left_top_right_angled(board, layer, center, sx, sy, cin, w, sp, n,
+                    create_left_top_sharp(board, layer, center, sx, sy, cin, w, sp, n,
                                                   mirror_x=mirror_x, mirror_y=mirror_y)
 
                 elif start == 1:
-                    create_left_center_right_angled(board, layer, center, sx, sy, cin, w, sp, n,
+                    create_left_center_sharp(board, layer, center, sx, sy, cin, w, sp, n,
                                                      mirror_x=mirror_x, mirror_y=mirror_y)
 
                 elif start == 2:
-                    create_left_bottom_right_angled(board, layer, center, sx, sy, cin, w, sp, n,
+                    create_left_bottom_sharp(board, layer, center, sx, sy, cin, w, sp, n,
                                                     mirror_x=mirror_x, mirror_y=mirror_y)
-            # if start == 0:
-            #     create_left_top(board, layer, center, sx, sy, r, cin, w, sp, n)
-            # elif start == 2:
-            #     create_left_bottom(board, layer, center, sx, sy, r, cin, w, sp, n)
-            # else:
-            #     create_left_center(board, layer, center, sx, sy, r, cin, w, sp, n)
 
         finally:
             if tx: tx.Commit()

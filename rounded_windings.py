@@ -5,7 +5,7 @@ from geometry import v2, validate_rounded_corner_core_clearance, transform_point
 
 
 # ----------------------Rounded Geometry routines ----------------------
-def create_left_center_single(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
+def create_left_center_rounded_single(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                                w_length: int, w_height: int, r_corner: int, clearance: int,
                                track_width: int, track_spacing: int, mirror_x = False,
                               mirror_y = False):
@@ -33,6 +33,10 @@ def create_left_center_single(board: "pcbnew.BOARD", layer: int, center: "pcbnew
     :type: int (internal units, nm)
     :param track_spacing: Minimum spacing between adjacent trace edges
     :type: int (internal units, nm)
+    :param mirror_x: Mirror about X-axis through center.
+    :type mirror_x: bool
+    :param mirror_y: Mirror about Y-axis through center.
+    :type mirror_y: bool
     """
 
     # Validation for radius to avoid intrusion of the track arc into the core corners
@@ -143,7 +147,7 @@ def create_left_center_single(board: "pcbnew.BOARD", layer: int, center: "pcbnew
         end_point = transform_point(now_x, ay - half_sep, center, mirror_x, mirror_y)  # return stub centre-y
         add_track(board, start_point, end_point, layer, t_width)
 
-def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
+def create_left_center_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                        w_length: int, w_height: int, r_corner: int, clearance: int,
                        track_width: int, track_spacing: int, n: int, mirror_x = False,
                        mirror_y = False):
@@ -171,6 +175,10 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     :type: int (internal units, nm)
     :param n: number of turns
     :type: int (internal units, nm)
+    :param mirror_x: Mirror about X-axis through center.
+    :type mirror_x: bool
+    :param mirror_y: Mirror about Y-axis through center.
+    :type mirror_y: bool
     """
 
     # Validation for radius to avoid intrusion of the track arc into the core corners
@@ -189,7 +197,7 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     #     return
 
     if n == 1:
-        create_left_center_single(board, layer, center, w_length, w_height, r_corner, clearance,
+        create_left_center_rounded_single(board, layer, center, w_length, w_height, r_corner, clearance,
                                   track_width, track_spacing, mirror_x=mirror_x, mirror_y=mirror_y)
         return
 
@@ -283,7 +291,7 @@ def create_left_center(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
         radius_now = radius_now + rad_inc2
 
 
-def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
+def create_left_bottom_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                        w_length: int, w_height: int, r_corner: int, clearance: int,
                        track_width: int, track_spacing: int, n: int, mirror_x = False,
                        mirror_y = False):
@@ -310,6 +318,10 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
     :type: int (internal units, nm)
     :param n: number of turns
     :type: int (internal units, nm)
+    :param mirror_x: Mirror about X-axis through center.
+    :type mirror_x: bool
+    :param mirror_y: Mirror about Y-axis through center.
+    :type mirror_y: bool
     """
 
     # Validation for radius to avoid intrusion of the track arc into the core corners
@@ -412,7 +424,7 @@ def create_left_bottom(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR
         radius_now = radius_now + t_spacing + t_width
 
 
-def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
+def create_left_top_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I",
                     w_length: int, w_height: int, r_corner: int, clearance: int,
                     track_width: int, track_spacing: int, n: int, mirror_x = False, mirror_y = False):
     """Draw a rectangle spiral starting from the left-bottom. All internal geometry is integer nanometers.
@@ -438,6 +450,10 @@ def create_left_top(board: "pcbnew.BOARD", layer: int, center: "pcbnew.VECTOR2I"
     :type: int (internal units, nm)
     :param n: number of turns
     :type: int (internal units, nm)
+    :param mirror_x: Mirror about X-axis through center.
+    :type mirror_x: bool
+    :param mirror_y: Mirror about Y-axis through center.
+    :type mirror_y: bool
     """
 
     # Validation for radius to avoid intrusion of the track arc into the core corners

@@ -8,7 +8,7 @@ def to_mm(v_nm):
     """
     return pcbnew.to_mm(v_nm)
 
-def d2r(a):
+def degree2rad(a):
     """Converts degrees to radians.
     :param a: Degrees to convert to radians
     :type a: float
