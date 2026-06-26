@@ -1,13 +1,12 @@
 """
 Interactive installer for KiCad pcbnew action plugins.
 
-Now installs TWO plugins:
-- main plugin  (default: winding_generator.py)
-- via plugin   (default: place_vias.py)
+Installs two plugin packages:
+- winding plugin package  (planar_winding_plugin)
+- via plugin package (via_plugin)
 
-Also installs two explicit assets next to the plugins:
-- icon    -> 'icon.png'
-- diagram -> 'parameter_sketch.png'
+Each package is copied or symlinked into KiCad's scripting/plugins directory.
+Assets such as icons and diagrams are expected to live inside their package.
 """
 
 import argparse
@@ -18,13 +17,8 @@ import shutil
 from pathlib import Path
 
 # --- defaults you may change ---
-DEFAULT_MAIN_PLUGIN = ["winding_action_plugin.py", "winding_gui.py", "winding_geometry.py",
-                             "winding_drawing.py", "rectangular_windings.py", "rounded_windings.py"]
-#DEFAULT_MAIN_PLUGIN = "planar_winding_plugin"
+DEFAULT_MAIN_PLUGIN = "planar_winding_plugin"
 DEFAULT_VIA_PLUGIN  = "via_plugin"
-ICON_TARGET_NAME = "icon.png"
-VIA_ICON_TARGET_NAME = "vias_icon.png"
-DIAGRAM_TARGET_NAME = "parameter_sketch.png"
 CONFIG_FILE = Path.home() / ".kicad_plugin_installer.json"
 CONFIG_KEY = "plugins_dir"
 # --------------------------------
@@ -96,28 +90,31 @@ def _remove_if_exists(dst: Path) -> None:
         except Exception:
             pass
 
-def install_file(src: Path, dst_dir: Path, target_name: str, link: bool, force_copy: bool = False):
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    dst = dst_dir / target_name
+def _install_package(repo_root: Path, package_name: str, dst_dir: Path, link: bool):
+    src = (repo_root / package_name).resolve()
+
+    if not src.is_dir():
+        print(f"⚠ Skipping package (not found): {src}")
+        return
+
+    dst = (dst_dir / package_name).resolve()
+
+    print(f"Installing package: {src.name} → {dst.name} "
+          f"({'symlink' if link else 'copy'})")
+
     _remove_if_exists(dst)
-    if link and not force_copy:
+    dst_dir.mkdir(parents=True, exist_ok=True)
+
+    if link:
         try:
-            os.symlink(src, dst)
+            os.symlink(src, dst, target_is_directory=True)
             print(f"✔ Symlink created: {dst} → {src}")
             return
         except OSError as e:
             print(f"⚠ Symlink failed ({e}). Falling back to copy.")
-    shutil.copy2(src, dst)
-    print(f"✔ Copied: {src.name} → {dst.name}")
 
-def _install_plugin(repo_root: Path, src_name: str, dst_dir: Path, target_name: str | None, link: bool):
-    src = (repo_root / src_name).resolve()
-    if not src.is_file():
-        print(f"⚠ Skipping (not found): {src}")
-        return
-    final_name = target_name or src.name
-    print(f"Installing Python : {src.name} → {final_name} ({'symlink' if link else 'copy'})")
-    install_file(src, dst_dir, final_name, link=link, force_copy=False)
+    shutil.copytree(src, dst)
+    print(f"✔ Copied package: {src.name} → {dst.name}")
 
 def main():
     ap = argparse.ArgumentParser(description="Install/Update KiCad plugins (asks for plugins folder first).")
@@ -125,16 +122,12 @@ def main():
     # Main spiral plugin
     ap.add_argument("--main-source", default=DEFAULT_MAIN_PLUGIN,
                     help=f"Main plugin file in this repo (default: {DEFAULT_MAIN_PLUGIN})")
-    ap.add_argument("--main-name", default=None,
-                    help="Target filename for main plugin in KiCad (default: same as source)")
     ap.add_argument("--main-link", action="store_true",
                     help="Symlink the main plugin instead of copying")
 
     # Via plugin
     ap.add_argument("--via-source", default=DEFAULT_VIA_PLUGIN,
                     help=f"Via plugin file in this repo (default: {DEFAULT_VIA_PLUGIN})")
-    ap.add_argument("--via-name", default=None,
-                    help="Target filename for via plugin in KiCad (default: same as source)")
     ap.add_argument("--via-link", action="store_true",
                     help="Symlink the via plugin instead of copying")
     ap.add_argument("--no-via", action="store_true",
@@ -145,12 +138,6 @@ def main():
                     help="Ignore saved folder and ask again")
     ap.add_argument("--kicad-major", default="9",
                     help="KiCad major version for guesses (default: 9)")
-    ap.add_argument("--icon-src", default="icon.png",
-                    help=f"Path to icon image to install as {ICON_TARGET_NAME} (default: icon.png)")
-    ap.add_argument("--diagram-src", default="parameter_sketch.png",
-                    help=f"Path to diagram image to install as {DIAGRAM_TARGET_NAME} (default: parameter_sketch.png)")
-    ap.add_argument("--via-icon-src", default="vias_icon.png",  # <— NEW
-                    help=f"Path to via icon image to install as {VIA_ICON_TARGET_NAME} (default: vias_icon.png)")
 
     args = ap.parse_args()
 
@@ -173,39 +160,13 @@ def main():
     print(f"\nKiCad plugins dir : {plugins_dir}")
 
     # Install main plugin
-    for args.main_source in DEFAULT_MAIN_PLUGIN:
-        _install_plugin(repo_root, args.main_source, plugins_dir, args.main_name, args.main_link)
-
+    _install_package(repo_root, args.main_source, plugins_dir, args.main_link)
     # Install via plugin (optional)
     if not args.no_via:
-        _install_plugin(repo_root, args.via_source, plugins_dir, args.via_name, args.via_link)
-
-    # Install icon → icon.png
-    icon_src = (repo_root / args.icon_src).resolve()
-    if icon_src.exists():
-        print(f"Installing icon    : {icon_src.name} → {ICON_TARGET_NAME} (copy)")
-        install_file(icon_src, plugins_dir, ICON_TARGET_NAME, link=False, force_copy=True)
-    else:
-        print(f"⚠ Icon not found   : {icon_src}")
-
-    # Install diagram → parameter_sketch.png
-    diagram_src = (repo_root / args.diagram_src).resolve()
-    if diagram_src.exists():
-        print(f"Installing diagram : {diagram_src.name} → {DIAGRAM_TARGET_NAME} (copy)")
-        install_file(diagram_src, plugins_dir, DIAGRAM_TARGET_NAME, link=False, force_copy=True)
-    else:
-        print(f"⚠ Diagram not found: {diagram_src}")
-
-    # Install via icon → vias_icon.png   (NEW)
-    via_icon_src = (repo_root / args.via_icon_src).resolve()
-    if via_icon_src.exists():
-        print(f"Installing via icon: {via_icon_src.name} → {VIA_ICON_TARGET_NAME} (copy)")
-        install_file(via_icon_src, plugins_dir, VIA_ICON_TARGET_NAME, link=False, force_copy=True)
-    else:
-        print(f"⚠ Via icon not found: {via_icon_src}")
+        _install_package(repo_root, args.via_source, plugins_dir, args.via_link)
 
     print("\nDone. In KiCad PCB Editor use: Tools → External Plugins → Refresh Plugins.")
-    print(f"Plugins expect {ICON_TARGET_NAME}, {DIAGRAM_TARGET_NAME} and {VIA_ICON_TARGET_NAME} next to them.")
+    # print(f"Plugins expect {ICON_TARGET_NAME}, {DIAGRAM_TARGET_NAME} and {VIA_ICON_TARGET_NAME} next to them.")
 
 if __name__ == "__main__":
     main()

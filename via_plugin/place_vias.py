@@ -168,5 +168,5 @@ class PlaceViaArray(pcbnew.ActionPlugin):
 
         pcbnew.Refresh()
 
-# Register plugin
-PlaceViaArray().register()
+# Register plugin in __init__ file
+
