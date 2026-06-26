@@ -20,8 +20,8 @@ from pathlib import Path
 # --- defaults you may change ---
 DEFAULT_MAIN_PLUGIN = ["winding_action_plugin.py", "winding_gui.py", "winding_geometry.py",
                              "winding_drawing.py", "rectangular_windings.py", "rounded_windings.py"]
-#DEFAULT_MAIN_PLUGIN = "winding_generator.py"
-DEFAULT_VIA_PLUGIN  = "place_vias.py"
+#DEFAULT_MAIN_PLUGIN = "planar_winding_plugin"
+DEFAULT_VIA_PLUGIN  = "via_plugin"
 ICON_TARGET_NAME = "icon.png"
 VIA_ICON_TARGET_NAME = "vias_icon.png"
 DIAGRAM_TARGET_NAME = "parameter_sketch.png"

@@ -2,13 +2,13 @@
 import pcbnew
 import os
 import wx
-from winding_gui import  ParamsDialog
-from winding_geometry import v2
-from winding_drawing import add_track
-from rectangular_windings import (create_left_bottom_sharp,
+from .winding_gui import  ParamsDialog
+from .winding_geometry import v2
+from .winding_drawing import add_track
+from .rectangular_windings import (create_left_bottom_sharp,
                                   create_left_center_sharp,
                                   create_left_top_sharp)
-from rounded_windings import (create_left_bottom_rounded,
+from .rounded_windings import (create_left_bottom_rounded,
                               create_left_center_rounded,
                               create_left_top_rounded)
 
@@ -117,4 +117,4 @@ class PlanarRectSpiralLC(pcbnew.ActionPlugin):
 
 
 # Register
-PlanarRectSpiralLC().register()
+#PlanarRectSpiralLC().register()
