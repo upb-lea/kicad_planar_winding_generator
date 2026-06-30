@@ -82,3 +82,54 @@ def transform_point(x, y, center, mirror_x=False, mirror_y=False):
     if mirror_x:
         y = 2 * center.y - y
     return v2(x, y)
+
+
+def layer_id(board, name):
+    """Resolve a human-readable layer name to a KiCad layer ID.
+
+    :param board: Current board instance
+    :type: pcbnew.BOARD
+    :param name: KiCad layer name (e.g "F.Cu", "B.Cu")
+    :type: str
+    :return: KiCad layer ID
+    :rtype: int
+    """
+
+    lid = board.GetLayerID(name)
+    return lid if lid != -1 else pcbnew.F_Cu
+
+
+def arc_points_from_center(center, radius, angle_start_deg, angle_end_deg):
+    """
+    Compute start, mid, and end points for a circular arc.
+
+    Uses KiCad-style board coordinates:
+    0 deg = +X/right
+    90 deg = +Y/down
+    180 deg = left
+    270 deg = up
+
+    The midpoint is chosen on the shortest sweep between start and end.
+    """
+
+    # Compute shortest signed angular sweep
+    delta = (angle_end_deg - angle_start_deg) % 360
+
+    if delta > 180:
+        delta -= 360
+
+    angle_mid_deg = angle_start_deg + delta / 2.0
+
+    def point_at(angle_deg):
+        """
+        Determine the x,y position for a given center, radius and angle
+        """
+        angle_rad = math.radians(angle_deg)
+        return v2(int(round(center.x + radius * math.cos(angle_rad))),
+                  int(round(center.y + radius * math.sin(angle_rad))))
+
+    start = point_at(angle_start_deg)
+    mid   = point_at(angle_mid_deg)
+    end   = point_at(angle_end_deg)
+
+    return start, mid, end
