@@ -1,6 +1,6 @@
 import pcbnew
 import math
-from .winding_functions import v2, degree2rad, transform_point, arc_points_from_center
+from .winding_functions import make_point, degree2rad, transform_point, arc_points_from_center
 
 
 def add_track(board, p1, p2, layer, width):
@@ -87,9 +87,9 @@ def add_arc(board, center, radius, ang_start_deg, ang_end_deg, layer, width):
     a1 = degree2rad(ang_start_deg)
     a3 = degree2rad(ang_end_deg)
     a2 = degree2rad((ang_start_deg + ang_end_deg) / 2.0)
-    start = v2(center.x + radius * math.cos(a1), center.y + radius * math.sin(a1))
-    mid   = v2(center.x + radius * math.cos(a2), center.y + radius * math.sin(a2))
-    end   = v2(center.x + radius * math.cos(a3), center.y + radius * math.sin(a3))
+    start = make_point(center.x + radius * math.cos(a1), center.y + radius * math.sin(a1))
+    mid   = make_point(center.x + radius * math.cos(a2), center.y + radius * math.sin(a2))
+    end   = make_point(center.x + radius * math.cos(a3), center.y + radius * math.sin(a3))
     arc = pcbnew.PCB_ARC(board)
     arc.SetLayer(layer); arc.SetWidth(max(width, 1))
     arc.SetStart(start); arc.SetMid(mid); arc.SetEnd(end)
@@ -125,7 +125,7 @@ def add_rect(board, x, y, w, h, layer):
     poly.SetFilled(True)
     poly.SetLayer(layer)
     poly.SetWidth(0)
-    pts = [v2(x, y), v2(x + w, y), v2(x + w, y + h), v2(x, y + h)]
+    pts = [make_point(x, y), make_point(x + w, y), make_point(x + w, y + h), make_point(x, y + h)]
     poly.SetPolyPoints(pts)
     board.Add(poly)
 

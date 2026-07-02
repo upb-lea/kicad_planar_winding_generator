@@ -1,6 +1,7 @@
 import pcbnew
 import math
 
+#-------------------conversions---------------------------
 def to_mm(v_nm):
     """Converts nm to mm
     :param v_nm: nm to convert
@@ -12,18 +13,82 @@ def degree2rad(a):
     """Converts degrees to radians.
     :param a: Degrees to convert to radians
     :type a: float
+    :return: angle
+    :rtype: float
     """
     return a * math.pi / 180.0
 
-def v2(x, y):
+#---------------------point/position generation and transformation-------------------------------------
+def make_point(x, y):
+    """Return a KiCad VECTOR2I point (position in 2D vector) from (x, y), casting to ints (nm units).
+    This function ensures coordinates are properly cast from floats to the required integer format.
+    :param x: X coordinate
+    :type x: float
+    :param y: Y coordinate
+    :type y: float
+    :return: A KiCad VECTOR2I point
+    :rtype: pcbnew.VECTOR2I
+    """
+    return pcbnew.VECTOR2I(int(round(x)), int(round(y)))
+
+def arc_points_from_center(center, radius, angle_start_deg, angle_end_deg):
+    """
+    Compute start, mid, and end points for a circular arc.
+
+    Uses KiCad-style board coordinates:
+    0 deg = +X/right
+    90 deg = +Y/down
+    180 deg = left
+    270 deg = up
+
+    The midpoint is chosen on the shortest sweep between start and end.
+    """
+
+    # Compute shortest signed angular sweep
+    delta = (angle_end_deg - angle_start_deg) % 360
+
+    if delta > 180:
+        delta -= 360
+
+    angle_mid_deg = angle_start_deg + delta / 2.0
+
+    def point_at(angle_deg):
+        """
+        Determine the x,y position for a given center, radius and angle
+        """
+        angle_rad = math.radians(angle_deg)
+        return make_point(int(round(center.x + radius * math.cos(angle_rad))),
+                          int(round(center.y + radius * math.sin(angle_rad))))
+
+    start = point_at(angle_start_deg)
+    mid   = point_at(angle_mid_deg)
+    end   = point_at(angle_end_deg)
+
+    return start, mid, end
+
+
+def transform_point(x, y, center, mirror_x=False, mirror_y=False):
     """Return a KiCad VECTOR2I point from (x, y), casting to ints (nm units).
     :param x: X coordinate
     :type x: float
     :param y: Y coordinate
     :type y: float
+    :param center: Mirror reference point.
+    :type center: pcbnew.VECTOR2I
+    :param mirror_x: If True, mirror about the X-axis through center.
+    :type mirror_x: bool
+    :param mirror_y: If True, mirror about the Y-axis through center.
+    :type mirror_y: bool
+    :return: Transformed coordinate tuple.
+    :rtype: tuple[int, int]
     """
-    return pcbnew.VECTOR2I(int(x), int(y))
+    if mirror_y:
+        x = 2 * center.x - x
+    if mirror_x:
+        y = 2 * center.y - y
+    return make_point(x, y)
 
+#-------------------------Geometry validation---------------------------------------
 def validate_rounded_corner_core_clearance(r_corner, clearance):
     """
     Validate that the rounded inner winding corner does not intrude into
@@ -62,28 +127,7 @@ def validate_rounded_corner_core_clearance(r_corner, clearance):
 
     return True, ""
 
-def transform_point(x, y, center, mirror_x=False, mirror_y=False):
-    """Return a KiCad VECTOR2I point from (x, y), casting to ints (nm units).
-    :param x: X coordinate
-    :type x: float
-    :param y: Y coordinate
-    :type y: float
-    :param center: Mirror reference point.
-    :type center: pcbnew.VECTOR2I
-    :param mirror_x: If True, mirror about the X-axis through center.
-    :type mirror_x: bool
-    :param mirror_y: If True, mirror about the Y-axis through center.
-    :type mirror_y: bool
-    :return: Transformed coordinate tuple.
-    :rtype: tuple[int, int]
-    """
-    if mirror_y:
-        x = 2 * center.x - x
-    if mirror_x:
-        y = 2 * center.y - y
-    return v2(x, y)
-
-
+#-------------------KiCad utilities----------------------------------
 def layer_id(board, name):
     """Resolve a human-readable layer name to a KiCad layer ID.
 
@@ -98,38 +142,3 @@ def layer_id(board, name):
     lid = board.GetLayerID(name)
     return lid if lid != -1 else pcbnew.F_Cu
 
-
-def arc_points_from_center(center, radius, angle_start_deg, angle_end_deg):
-    """
-    Compute start, mid, and end points for a circular arc.
-
-    Uses KiCad-style board coordinates:
-    0 deg = +X/right
-    90 deg = +Y/down
-    180 deg = left
-    270 deg = up
-
-    The midpoint is chosen on the shortest sweep between start and end.
-    """
-
-    # Compute shortest signed angular sweep
-    delta = (angle_end_deg - angle_start_deg) % 360
-
-    if delta > 180:
-        delta -= 360
-
-    angle_mid_deg = angle_start_deg + delta / 2.0
-
-    def point_at(angle_deg):
-        """
-        Determine the x,y position for a given center, radius and angle
-        """
-        angle_rad = math.radians(angle_deg)
-        return v2(int(round(center.x + radius * math.cos(angle_rad))),
-                  int(round(center.y + radius * math.sin(angle_rad))))
-
-    start = point_at(angle_start_deg)
-    mid   = point_at(angle_mid_deg)
-    end   = point_at(angle_end_deg)
-
-    return start, mid, end

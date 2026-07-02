@@ -1,7 +1,7 @@
 import wx
 import math
 from .winding_drawing import add_track, add_arc, add_arc_transformed_points
-from .winding_functions import v2, validate_rounded_corner_core_clearance, transform_point
+from .winding_functions import make_point, validate_rounded_corner_core_clearance, transform_point
 
 
 # ----------------------Rounded Geometry routines ----------------------
@@ -94,7 +94,7 @@ def create_left_center_rounded_single(board: "pcbnew.BOARD", layer: int, center:
         now_y = now_y + (f_height // 2) - half_sep
 
     #  Arc bottom-left
-    arc_center = v2(now_x + radius_now, now_y)
+    arc_center = make_point(now_x + radius_now, now_y)
     add_arc_transformed_points(board, arc_center, radius_now, 90, 90 + angle, layer, t_width,
                                center, mirror_x, mirror_y)
     now_x = now_x + radius_now
@@ -107,7 +107,7 @@ def create_left_center_rounded_single(board: "pcbnew.BOARD", layer: int, center:
     now_x = now_x + f_length
 
     #  Arc bottom-right
-    arc_center = v2(now_x, now_y - radius_now)
+    arc_center = make_point(now_x, now_y - radius_now)
     add_arc_transformed_points(board, arc_center, radius_now, 0, 90, layer, t_width,
                                center, mirror_x, mirror_y)
     now_x = now_x + radius_now
@@ -120,7 +120,7 @@ def create_left_center_rounded_single(board: "pcbnew.BOARD", layer: int, center:
     now_y = now_y - f_height
 
     #  Arc top-right
-    arc_center = v2(now_x - radius_now, now_y)
+    arc_center = make_point(now_x - radius_now, now_y)
     add_arc_transformed_points(board, arc_center, radius_now, 270, 360, layer, t_width,
                                center, mirror_x, mirror_y)
     now_x = now_x - radius_now
@@ -133,7 +133,7 @@ def create_left_center_rounded_single(board: "pcbnew.BOARD", layer: int, center:
     now_x = now_x - f_length
 
     #  Arc top-left (radius unchanged — single turn, no increment)
-    arc_center = v2(now_x, now_y + radius_now)
+    arc_center = make_point(now_x, now_y + radius_now)
     add_arc_transformed_points(board, arc_center, radius_now, 270 - angle, 270, layer, t_width,
                                center, mirror_x, mirror_y)
     now_x = now_x - radius_now
@@ -235,7 +235,7 @@ def create_left_center_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbne
             now_y = now_y + (f_height // 2)
 
         # Arc bottom-left
-        arc_center = v2(now_x + radius_now, now_y)
+        arc_center = make_point(now_x + radius_now, now_y)
         add_arc_transformed_points(board, arc_center, radius_now, 90, 90 + angle, layer, t_width,
                                    center, mirror_x, mirror_y)
         now_x = now_x + radius_now
@@ -248,7 +248,7 @@ def create_left_center_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbne
         now_x = now_x + f_length
 
         # Arc bottom-right
-        arc_center = v2(now_x, now_y - radius_now)
+        arc_center = make_point(now_x, now_y - radius_now)
         add_arc_transformed_points(board, arc_center, radius_now, 0, 90, layer, t_width,
                                    center, mirror_x, mirror_y)
         now_x = now_x + radius_now
@@ -261,7 +261,7 @@ def create_left_center_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbne
         now_y = now_y - f_height
 
         # Arc top-right
-        arc_center = v2(now_x - radius_now, now_y)
+        arc_center = make_point(now_x - radius_now, now_y)
         add_arc_transformed_points(board, arc_center, radius_now, 270, 360, layer, t_width,
                                    center, mirror_x, mirror_y)
         now_x = now_x - radius_now
@@ -276,7 +276,7 @@ def create_left_center_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbne
         radius_now = radius_now + rad_inc1
 
         # Arc top-left
-        arc_center = v2(now_x, now_y + radius_now)
+        arc_center = make_point(now_x, now_y + radius_now)
         add_arc_transformed_points(board, arc_center, radius_now, 270 - angle, 270, layer, t_width,
                                    center, mirror_x, mirror_y)
         now_x = now_x - radius_now
@@ -370,7 +370,7 @@ def create_left_bottom_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbne
         now_x = now_x + f_length
 
         # Arc bottom-right
-        arc_center = v2(now_x, now_y - radius_now)
+        arc_center = make_point(now_x, now_y - radius_now)
         add_arc_transformed_points(board, arc_center, radius_now, 0, 90, layer, t_width,
                                    center, mirror_x, mirror_y)
         now_x = now_x + radius_now
@@ -383,7 +383,7 @@ def create_left_bottom_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbne
         now_y = now_y - f_height
 
         # Arc top-right
-        arc_center = v2(now_x - radius_now, now_y)
+        arc_center = make_point(now_x - radius_now, now_y)
         add_arc_transformed_points(board, arc_center, radius_now, 270, 360, layer, t_width,
                                    center, mirror_x, mirror_y)
         now_x = now_x - radius_now
@@ -396,7 +396,7 @@ def create_left_bottom_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbne
         now_x = now_x - f_length
 
         # Arc top-left
-        arc_center = v2(now_x, now_y + radius_now)
+        arc_center = make_point(now_x, now_y + radius_now)
         add_arc_transformed_points(board, arc_center, radius_now, 180, 270, layer, t_width,
                                    center, mirror_x, mirror_y)
         now_x = now_x - radius_now
@@ -415,7 +415,7 @@ def create_left_bottom_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbne
         add_track(board, start_point, end_point, layer, t_width)
         now_y = now_y + f_height + t_width + t_spacing
 
-        arc_center = v2(now_x + radius_now, now_y)
+        arc_center = make_point(now_x + radius_now, now_y)
         add_arc_transformed_points(board, arc_center, radius_now, 90, 180, layer, t_width,
                                    center, mirror_x, mirror_y)
         now_x = now_x + radius_now
@@ -501,7 +501,7 @@ def create_left_top_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbnew.V
         now_y = now_y + f_height
 
         # Arc bottom-left
-        arc_center = v2(now_x + radius_now, now_y)
+        arc_center = make_point(now_x + radius_now, now_y)
         add_arc_transformed_points(board, arc_center, radius_now, 90, 180, layer, t_width,
                                    center, mirror_x, mirror_y)
         now_x = now_x + radius_now
@@ -514,7 +514,7 @@ def create_left_top_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbnew.V
         now_x = now_x + f_length
 
         # Arc bottom-right
-        arc_center = v2(now_x, now_y - radius_now)
+        arc_center = make_point(now_x, now_y - radius_now)
         add_arc_transformed_points(board, arc_center, radius_now, 0, 90, layer, t_width,
                                    center, mirror_x, mirror_y)
         now_x = now_x + radius_now
@@ -527,7 +527,7 @@ def create_left_top_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbnew.V
         now_y = now_y - f_height
 
         # Arc top-right
-        arc_center = v2(now_x - radius_now, now_y)
+        arc_center = make_point(now_x - radius_now, now_y)
         add_arc_transformed_points(board, arc_center, radius_now, 270, 360, layer, t_width,
                                    center, mirror_x, mirror_y)
         now_x = now_x - radius_now
@@ -548,7 +548,7 @@ def create_left_top_rounded(board: "pcbnew.BOARD", layer: int, center: "pcbnew.V
         now_x = now_x - f_length - t_width - track_spacing
 
         # Arc top-left
-        arc_center = v2(now_x, now_y + radius_now)
+        arc_center = make_point(now_x, now_y + radius_now)
         add_arc_transformed_points(board, arc_center, radius_now, 180, 270, layer, t_width,
                 center, mirror_x, mirror_y)
         now_x = now_x - radius_now
