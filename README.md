@@ -80,10 +80,14 @@ The spiral is drawn as TRACKs and 90° ARCs on the chosen layer or as filled pol
 ## Example
 These examples show the usage of the plugin.
 The core dimensions are based on ELP 22/6/16 core. 
-<!-- This shows an example for winding with rounded corners-->
-<img src = "/images/planar_winding_rounded_example.png" width = "80%">
-<!-- This shows an example for winding with sharp corners-->
-<img src = "/images/planar_winding_sharp_example.png" width = "80%">
+
+**Rounded corner example**
+
+![Gui dialog box](/images/planar_winding_rounded_example.png)
+
+**Sharp corner example**
+
+![Gui dialog box](/images/planar_winding_sharp_example.png)
 
 ---
 ## GUI Parameters
