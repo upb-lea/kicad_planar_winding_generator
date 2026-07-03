@@ -78,14 +78,12 @@ winding-generator/
 The spiral is drawn as TRACKs and 90° ARCs on the chosen layer or as filled polygon for sharp corner winding.
 
 ## Example
-This example shows the usage of the plugin.
+These examples show the usage of the plugin.
 The core dimensions are based on ELP 22/6/16 core. 
-
-| Gui dialog box                                                | Generated Winding                                             |
-|---------------------------------------------------------------|---------------------------------------------------------------|
-| ![Gui dialog box](/images/gui_dialog_box_rounded_example.png) | ![Gui dialog box](/images/planar_winding_rounded_example.png) |
-| ![Gui dialog box](/images/gui_dialog_box_sharp_example.png)   | ![Gui dialog box](/images/planar_winding_sharp_example.png)   |
-
+<!-- This shows an example for winding with rounded corners-->
+<img src = "/images/planar_winding_rounded_example.png" width = "80%">
+<!-- This shows an example for winding with sharp corners-->
+<img src = "/images/planar_winding_sharp_example.png" width = "80%">
 
 ---
 ## GUI Parameters
