@@ -83,11 +83,11 @@ The core dimensions are based on ELP 22/6/16 core.
 
 **Rounded corner example**
 
-![Gui dialog box](/images/planar_winding_rounded_example.png)
+![Gui dialog box](images/planar_winding_rounded_example.png)
 
 **Sharp corner example**
 
-![Gui dialog box](/images/planar_winding_sharp_example.png)
+![Gui dialog box](images/planar_winding_sharp_example.png)
 
 ---
 ## GUI Parameters
